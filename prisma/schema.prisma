@@ -30,21 +30,44 @@ model Session {
 }
 
 model Webhook {
-  id        Int      @id @default(autoincrement())
-  sessionId Int
-  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  url       String
-  // segredo para assinatura HMAC (webhooks v2)
-  secret    String?
-  // eventos assinados, ex.: ["message.received"]
-  events    Json     @default("[\"message.received\"]")
-  active    Boolean  @default(true)
-  // criado pela rota antiga /sendHook (um por sessão)
-  legacy    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int               @id @default(autoincrement())
+  // null = todas as sessões
+  sessionId  Int?
+  session    Session?          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  url        String
+  // segredo da assinatura HMAC (X-MyZap-Signature); webhooks antigos não assinam
+  secret     String?
+  // eventos assinados, ex.: ["message.received", "conversation.handoff"]
+  events     Json              @default("[\"message.received\"]")
+  active     Boolean           @default(true)
+  // criado pela rota antiga /sendHook (um por sessão, formato antigo)
+  legacy     Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  deliveries WebhookDelivery[]
 
   @@index([sessionId])
+}
+
+model WebhookDelivery {
+  id            Int       @id @default(autoincrement())
+  webhookId     Int
+  webhook       Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event         String
+  payload       Json
+  // pending | success | failed
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastStatus    Int?
+  lastError     String?
+  durationMs    Int?
+  createdAt     DateTime  @default(now())
+  deliveredAt   DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, id])
+  @@index([createdAt])
 }
 
 model Contact {

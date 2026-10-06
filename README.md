@@ -1,233 +1,248 @@
-# MyZap - Free Open Source Whatsapp Api
+# MyZap
 
-[![Video explicativo do projeto](https://img.youtube.com/vi/blOpjAS1Fik/0.jpg)](https://www.youtube.com/watch?v=blOpjAS1Fik)
+Plataforma open source de atendimento pelo WhatsApp: API para integrar sistemas, painel com inbox para a equipe, bot de fluxos com editor visual, assistentes de IA (Claude) e webhooks.
 
+[![Vídeo explicativo do projeto](https://img.youtube.com/vi/blOpjAS1Fik/0.jpg)](https://www.youtube.com/watch?v=blOpjAS1Fik)
 
-[Grupo do Whatsapp: Link para o nosso grupo para tirar dúvidas e nos ajudarmos (clique aqui)](https://chat.whatsapp.com/DMehlYDcMWiKmlIsOLGAQM)
+[Grupo do WhatsApp para dúvidas e ajuda (clique aqui)](https://chat.whatsapp.com/DMehlYDcMWiKmlIsOLGAQM)
 
+O MyZap usa o [WPPConnect](https://github.com/wppconnect-team/wppconnect): um Chromium sem interface abre o WhatsApp Web e o MyZap o controla por código. Cada **sessão** é um número de WhatsApp conectado lendo um QR code, como no WhatsApp Web.
 
+## O que tem
 
-Este projeto usa como base o [Venom-bot](https://github.com/orkestral/venom) ou o [WPPCONNECT](https://github.com/wppconnect-team/wppconnect), um navegador virtual sem interface gráfica que abre o whatsapp web e executa todos os comandos via código possibilitando assim a automação de todas as funções.
+- **Painel web** com login, tema claro/escuro e layout para celular.
+- **Atendimento (inbox):** fila, conversas atribuídas a cada atendente, chat com mídia em tempo real, transferência entre atendentes, notas internas, respostas rápidas, etiquetas e notificações.
+- **Bot de fluxos:** editor visual (menus, perguntas, condições, horário de atendimento, requisições HTTP, transferência) com simulador e publicação por versões.
+- **Assistentes de IA:** respostas com Claude a partir das suas instruções e base de conhecimento, com transferência para a equipe quando não souber responder.
+- **API v1** documentada (Swagger), com chaves de API por integração. As rotas originais do MyZap (`/sendText`, `/start`...) continuam funcionando.
+- **Webhooks** assinados, com reenvio automático e histórico de entregas.
+- Histórico completo em banco (SQLite), sessões que reconectam sozinhas, métricas Prometheus e backup.
 
-## Docker (recomendado)
-
-A imagem (`node:24-bookworm-slim` + Chromium do Debian) já traz todas as dependências de sistema.
+## Começando (Docker)
 
 ```bash
 git clone https://github.com/billbarsch/myzap.git
 cd myzap
-cp .env_example .env      # ajuste ENGINE, API_TOKEN etc.
+cp .env_example .env      # defina ao menos ADMIN_EMAIL e ADMIN_PASSWORD
 docker compose up -d --build
 ```
 
-- A API sobe em `http://localhost:3333` (troque a porta do host com `PORT` no `.env`).
-- As sessões ficam no volume `myzap_tokens`, então reiniciar o container não exige ler o QR code de novo.
-- Sessões e webhooks ficam salvos em SQLite no volume `myzap_data` (as migrations rodam sozinhas ao iniciar). Uma sessão iniciada com `/start` volta sozinha quando o servidor reinicia; `/close` desliga esse retorno.
-- Variáveis do `.env`:
-  - `ENGINE=WPPCONNECT` (padrão) ou `ENGINE=VENOM`. Obs.: o venom-bot não tem releases desde 11/2024 e, em testes de 10/2026, abre o WhatsApp Web mas não gera o QR code. Prefira o WPPCONNECT.
-  - `API_TOKEN=<segredo>`: protege todas as rotas (exceto `/`). Envie `Authorization: Bearer <segredo>` ou `?token=<segredo>`.
-  - `LOG_LEVEL` (padrão `info`): os logs saem em JSON (pino). Em terminal de desenvolvimento saem formatados.
-  - `CORS_ORIGINS`: origens liberadas, separadas por vírgula (vazio libera qualquer origem).
-  - `RATE_LIMIT_PER_MINUTE` (padrão `600` por IP, `0` desativa) e `TRUST_PROXY=1` quando estiver atrás de nginx/traefik.
-- Desenvolvimento com hot-reload (código montado no container): `docker compose --profile dev up --build myzap-dev`
+1. Abra `http://localhost:3333` e entre com o `ADMIN_EMAIL`/`ADMIN_PASSWORD` do `.env`. Sem eles, o painel pede para criar o administrador no primeiro acesso.
+2. Em **Sessões → Nova sessão**, dê um nome (ex.: `loja`) e leia o QR code com o celular: *WhatsApp → Configurações → Aparelhos conectados → Conectar um aparelho*. O QR code expira em cerca de 1 minuto; se a sessão fechar, é só iniciar de novo.
+3. Pronto: as mensagens recebidas aparecem em **Atendimento**. Para respostas automáticas, crie um **Fluxo** ou um **Assistente de IA** e ligue em *Sessões → sessão → Bot*.
+
+Dados ficam em dois volumes: `myzap_tokens` (login do WhatsApp; reiniciar não pede QR de novo) e `myzap_data` (banco SQLite, mídias, segredo do login). As migrations do banco rodam sozinhas ao iniciar.
+
 - Logs: `docker compose logs -f myzap`
+- Desenvolvimento com hot-reload no container: `docker compose --profile dev up --build myzap-dev`
 
-> O endpoint `POST /exec`, que executava comandos de shell no servidor, foi removido por segurança.
+## Configuração (`.env`)
 
-> Os parâmetros são validados. Uma requisição inválida (sessão sem `sessionName`, nome com `/` ou `..`, número que não é telefone, URL inválida) responde **HTTP 400** com `{ "result": "error", "message": "INVALID_PARAMS", "errors": [...] }`. O `number` aceita máscara (`+55 (63) 3414-0378`) ou o id completo (`...@c.us`, `...@g.us`).
+| Variável | Padrão | Para que serve |
+|---|---|---|
+| `PORT` | `3333` | Porta HTTP. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | — | Cria o primeiro administrador no boot (só se ainda não houver usuários). |
+| `API_TOKEN` | — | Token mestre para integrações antigas (`Authorization: Bearer <token>`). Para integrações novas, prefira chaves de API criadas no painel. |
+| `ANTHROPIC_API_KEY` | — | Chave da API da Anthropic (platform.claude.com) para os assistentes de IA. Sem ela a IA fica desligada. |
+| `TIMEZONE` | `America/Sao_Paulo` | Fuso usado pela IA para saber a data e a hora. |
+| `JWT_SECRET` | gerado | Segredo do login do painel. Sem ele, um segredo aleatório é salvo em `DATA_DIR/jwt-secret`. |
+| `SESSION_TTL_HOURS` | `168` | Duração do login do painel. |
+| `COOKIE_SECURE` | igual a `HTTPS` | Use `1` atrás de um proxy com HTTPS. |
+| `CORS_ORIGINS` | qualquer | Origens liberadas, separadas por vírgula. |
+| `RATE_LIMIT_PER_MINUTE` | `600` | Requisições por minuto por IP (`0` desliga). |
+| `TRUST_PROXY` | — | `1` atrás de nginx/traefik, para o limite enxergar o IP real. |
+| `DATA_DIR` | `./data` | Banco, mídias e backups. |
+| `DATABASE_URL` | `file:DATA_DIR/myzap.db` | Caminho do SQLite. |
+| `DB_MIGRATE` | `1` | `0` desliga as migrations automáticas ao iniciar. |
+| `MEDIA_MAX_MB` | `50` | Tamanho máximo de mídia recebida que é baixada. |
+| `TOKENS_DIR` | `./tokens` | Login das sessões do WhatsApp. |
+| `CHROME_PATH` | — | Caminho do Chromium (no Docker já vem configurado). |
+| `ENGINE` | `WPPCONNECT` | `VENOM` está obsoleto (venom-bot sem atualizações desde 11/2024 e sem gerar QR code em testes de 10/2026). |
+| `LOG_LEVEL` | `info` | `trace`, `debug`, `info`, `warn`, `error` ou `silent`. Logs em JSON. |
+| `HTTPS`, `SSL_KEY_PATH`, `SSL_CERT_PATH` | — | HTTPS direto no Node (prefira um proxy reverso; veja abaixo). |
+
+## Painel
+
+| Área | O que faz | Quem vê |
+|---|---|---|
+| Painel | Sessões conectadas, fila, conversas em atendimento, não lidas e mensagens dos últimos 7 dias. | Todos |
+| Atendimento | Filas *Fila*, *Minhas*, *Abertas* e *Encerradas*. Assumir, transferir, devolver à fila ou ao bot, encerrar e reabrir. Notas internas, `/atalho` para respostas rápidas, anexos, etiquetas e notificação do navegador. | Todos |
+| Sessões | Criar, conectar pelo QR code (atualiza ao vivo), reconectar, fechar e escolher o bot. Atendentes só consultam. | Todos |
+| Fluxos | Editor visual, simulador com o rascunho, validação e publicação por versões. | Administradores |
+| Assistentes de IA | Instruções, base de conhecimento, modelo, estilo de resposta, limites, playground e custo dos últimos 30 dias. | Administradores |
+| Enviar mensagem | Teste de envio pela API com o `curl` equivalente. | Administradores |
+| Webhooks | Cadastro, segredo da assinatura, envio de teste e histórico de entregas com reenvio. | Administradores |
+| Configurações | Usuários (administradores e atendentes), respostas rápidas, chaves de API e troca de senha. | Administradores (Minha conta: todos) |
+
+Como as conversas andam:
+
+- Com o bot desligado (padrão), toda conversa nova entra na **Fila**. Com bot ligado, começa **com o bot** e vai para a fila quando o fluxo ou a IA transfere, quando o cliente escreve "atendente"/"humano" (configurável no fluxo) ou se algo der errado.
+- O bot e a IA só respondem conversas *com o bot*. Assumir uma conversa os faz parar. Grupos ficam de fora.
+- Responder pelo painel assume a conversa. Responder uma conversa encerrada a reabre.
+
+### Bot de fluxos
+
+Blocos: mensagem, menu numerado, pergunta (qualquer texto, número, e-mail ou telefone), condição, horário de atendimento, aguardar, requisição HTTP, etiqueta, IA, transferir e fim. Nas mensagens, use `{{contact.name}}`, `{{contact.number}}` e as respostas guardadas (`{{pedido}}`, `{{resposta.campo}}`).
+
+- **Testar** abre um simulador com o rascunho atual, sem WhatsApp. **Publicar** valida o fluxo e cria uma versão; as sessões só usam a versão publicada.
+- Após 3 respostas inválidas num menu, transfere (ou segue a saída "Não entendeu"). Após 30 min sem resposta (configurável), o fluxo recomeça.
+
+### Assistentes de IA
+
+- O assistente responde com base nas **instruções** e na **base de conhecimento** e não inventa o que não está lá: nesses casos, e em reclamações, negociações e pagamentos, transfere para a fila e deixa o motivo como nota interna.
+- Modelo padrão **Claude Opus 5**. Claude Sonnet 5 e Claude Haiku 4.5 são opções mais baratas, escolhidas por assistente.
+- Ligue de duas formas: na sessão (a IA atende tudo) ou com o bloco **IA** num fluxo (ex.: a opção "Outros assuntos" de um menu).
+- Sem `ANTHROPIC_API_KEY`, acima do limite de respostas por hora ou se a API falhar, a conversa vai para a fila.
+- As instruções e a base de conhecimento ficam em cache entre as mensagens (mais barato em conversas longas). Com o Opus 5, se o modelo recusar uma resposta por segurança, a API tenta um modelo de reserva na mesma chamada.
+
+## API
+
+- **Documentação interativa:** `http://localhost:3333/api/docs` (Swagger) e `/api/openapi.json` (OpenAPI 3.1).
+- **Autenticação:** `Authorization: Bearer <chave>` com uma chave de API (`mzk_...`, criada em *Configurações → Chaves de API*) ou o `API_TOKEN`. O painel usa cookie de login.
+- **Papéis:** administrador (tudo), atendente (conversas e contatos) e integração (chave de API: tudo menos usuários e chaves).
+- **Respostas:** sucesso em `{ "data": ... }` (listas com `meta`); erro em `{ "error": { "code", "message", "details" } }` com o status HTTP: 400 parâmetro inválido, 401, 403, 404, 409 sessão desconectada, 502 falha no WhatsApp.
+
+```bash
+curl -X POST http://localhost:3333/api/v1/sessions/loja/messages \
+  -H "Authorization: Bearer $MYZAP_API_KEY" -H "Content-Type: application/json" \
+  -d '{"to": "5511999999999", "type": "text", "text": "Olá!"}'
+```
+
+Tipos de mensagem: `text`, `file` (`base64` + `fileName`), `voice`, `location` (`lat`, `lng`), `link` e `contact`. O destino aceita número com DDI (com ou sem máscara) ou o id do WhatsApp (`...@c.us`, `...@g.us`).
+
+Sem `API_TOKEN`, usuários ou chaves, a API fica aberta como nas versões antigas (com aviso no log). Criar o primeiro usuário ou chave fecha a API.
+
+### Rotas antigas (compatibilidade)
+
+Continuam com o formato `{ "result": "success" | "error", "message" }`. Parâmetros inválidos agora respondem **HTTP 400** com `message: "INVALID_PARAMS"`.
+
+| Rota | Parâmetros |
+|---|---|
+| `GET /start` · `/status` · `/close` | `sessionName` |
+| `GET /qrcode` | `sessionName`, `image=true` para PNG |
+| `POST /sendText` | `sessionName`, `number`, `text` |
+| `POST /sendFile` · `/sendImageStorie` | `sessionName`, `number`, `base64Data`, `fileName`, `caption` |
+| `POST /sendVoice` · `/sendLocation` · `/sendLink` · `/sendContactVcard` · `/sendTextToStorie` | ver `/api/docs` e `server/schemas.js` |
+| `GET /getAllChatsNewMsg` · `/getAllUnreadMessages` · `/checkNumberStatus` · `/getNumberProfile` | `sessionName` (e `number`) |
+| `POST /sendHook` | `sessionName`, `hook` (URL que recebe as mensagens no formato antigo) |
+
+Mensagens enviadas por essas rotas também ficam no histórico e aparecem no Atendimento.
+
+## Webhooks
+
+Cadastre em **Webhooks** (ou `POST /api/v1/webhooks`). Para cada evento escolhido, o MyZap envia um `POST` com JSON:
+
+```json
+{ "id": 42, "event": "message.received", "createdAt": "2026-10-06T14:32:00.000Z",
+  "data": { "session": "loja", "message": { ... }, "conversation": { "id": 7, "status": "pending" }, "contact": { "waId": "5511999999999@c.us", "pushName": "Maria" } } }
+```
+
+| Evento | Quando |
+|---|---|
+| `message.received` | Mensagem recebida de um contato. |
+| `message.sent` | Mensagem enviada pela API, bot, IA, atendente ou pelo celular. |
+| `conversation.updated` | Conversa mudou de status ou de atendente. |
+| `conversation.handoff` | Bot ou IA transferiu para a fila (com o motivo). |
+| `session.state` | A sessão conectou, caiu ou pediu QR code. |
+
+- **Assinatura:** cada envio traz `X-MyZap-Timestamp` e `X-MyZap-Signature: sha256=<HMAC-SHA256 de "timestamp.corpo" com o segredo>`. Confira com o corpo bruto e recuse timestamps antigos. A tela do webhook tem o segredo e um exemplo em Node.js.
+- **Reenvio:** respostas fora de 2xx ou falhas de rede são reenviadas com espera crescente (10 s, 1 min, 5 min, 30 min, 2 h, 6 h), até 7 tentativas. Cada entrega pode ser reenviada à mão. O histórico guarda 7 dias.
+- Webhooks antigos de `/sendHook` continuam recebendo a mensagem original do WhatsApp, sem assinatura. Eles aparecem na lista e podem ser pausados ou removidos.
+
+## Tempo real
+
+Socket.IO em `/socket.io`, autenticado pelo cookie do painel ou por `auth: { token: "<chave de API>" }`. Eventos: `sessions` (estado inicial), `session.state`, `session.qrcode` (só administradores e integrações), `message.saved`, `message.updated`, `conversation.updated`, `conversations.changed` e `contact.updated`.
+
+## Métricas
+
+`GET /metrics` no formato Prometheus, com chave de API ou login de administrador:
+
+```yaml
+scrape_configs:
+  - job_name: myzap
+    metrics_path: /metrics
+    bearer_token: mzk_...   # chave de API criada no painel
+    static_configs: [{ targets: ['myzap:3333'] }]
+```
+
+Inclui sessões por estado, conversas por status, mensagens por direção e origem, transferências por motivo, fila e resultado dos webhooks, chamadas, tokens e tempo de resposta da IA, duração das requisições HTTP por rota e métricas do processo Node.
+
+## Backup
+
+```bash
+npm run db:backup                            # fora do Docker
+docker compose exec myzap npm run db:backup  # no Docker
+```
+
+Cria uma cópia consistente do banco (mesmo com o servidor rodando) em `DATA_DIR/backups/` e mantém as 14 mais recentes (`-- --keep 30` para mudar). Para restaurar, pare o MyZap e troque `DATA_DIR/myzap.db` pelo backup. As mídias ficam em `DATA_DIR/media` e o login do WhatsApp no volume de tokens: inclua os dois no backup do servidor.
+
+O banco é SQLite, suficiente para uma instância com algumas sessões. Outros bancos (como PostgreSQL) ainda não são suportados: exigiriam trocar o `provider` em `prisma/schema.prisma`, o adapter em `server/db.js` e gerar migrations novas.
+
+## Instalação sem Docker
+
+```bash
+sudo apt install -y curl git chromium fonts-liberation ca-certificates
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs   # Node 22.12+ (24 LTS recomendado)
+git clone https://github.com/billbarsch/myzap.git && cd myzap
+PUPPETEER_SKIP_DOWNLOAD=true npm install
+npm run web:install && npm run build          # painel
+cp .env_example .env                          # CHROME_PATH=/usr/bin/chromium
+npm start
+```
+
+Para manter rodando após reiniciar o servidor: `npm install -g pm2 && pm2 start index.js && pm2 startup`.
+
+## HTTPS
+
+O recomendado é um proxy reverso (nginx, Caddy, Traefik) com HTTPS na frente do MyZap. Configure `TRUST_PROXY=1` e `COOKIE_SECURE=1` e encaminhe o WebSocket de `/socket.io`. No nginx:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3333;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Também dá para servir HTTPS direto com `HTTPS=1`, `SSL_KEY_PATH` e `SSL_CERT_PATH` (por exemplo, certificados do certbot).
 
 ## Desenvolvimento
 
 ```
-server/
-  index.js          bootstrap (http/https, shutdown)
-  app.js            createApp(): Express sem listen (usado nos testes)
-  http.js           segurança (helmet, cors, rate limit), auth, validação, erros
-  schemas.js        schemas zod das rotas
-  routes/legacy.js  rotas da API
+server/             backend Node.js (Express, CommonJS)
+  index.js          bootstrap: migrations, HTTP, tempo real, webhooks, shutdown
+  app.js            createApp(): rotas, painel e segurança (usado nos testes)
   sessions.js       ciclo de vida das sessões do WhatsApp
   engine/           adapters wppconnect / venom
-test/               testes (vitest + supertest, sem navegador)
-web/                painel React (build em web/dist, servido pelo Express)
+  history.js        gravação de contatos, conversas, mensagens e mídias
+  messaging.js      envio de mensagens (rotas antigas e v1)
+  pipeline/         bot: fluxos (flows.js), IA (ai.js) e decisão (index.js)
+  routes/legacy.js  rotas antigas
+  routes/v1/        API v1 (gera o OpenAPI a partir dos schemas zod)
+  webhooks.js       fila e envio de webhooks
+  realtime.js       Socket.IO
+  metrics.js        Prometheus
+prisma/             schema e migrations (SQLite)
+web/                painel (React + Vite + TypeScript + Tailwind), package.json próprio
+test/               testes (vitest + supertest; sem navegador nem WhatsApp)
+scripts/            backup do banco
 ```
 
-- `npm run db:migrate -- --name <nome>` cria uma migration depois de alterar `prisma/schema.prisma`; `npm run db:studio` abre o banco no navegador.
-- `npm test` · `npm run lint` · `npm run format` · `npm run check` (tudo o que o CI roda, inclusive lint e typecheck do painel)
-- O painel fica em `web/` (React + Vite + TypeScript + Tailwind), com `package.json` próprio.
+- API com hot-reload: `npm run dev`. Painel: `npm run web:dev` (porta 5173, repassa `/api` e `/socket.io` para a 3333).
+- `npm run check` roda o que o CI roda: lint, formatação, testes e lint/typecheck do painel.
+- Depois de alterar `prisma/schema.prisma`: `npm run db:migrate -- --name <nome>`. Para ver o banco: `npm run db:studio`.
 
-## Painel
+## Mudanças em relação ao MyZap original
 
-Abra `http://localhost:3333` no navegador. No primeiro acesso o painel pede para criar o administrador.
-
-- **Painel:** sessões conectadas, conversas aguardando atendente, não lidas e mensagens dos últimos 7 dias.
-- **Sessões:** criar, conectar lendo o QR code (atualiza ao vivo), reconectar e fechar.
-- **Atendimento (inbox):** filas *Fila* (aguardando atendente), *Minhas*, *Abertas* e *Encerradas*, busca por nome/número, chat com fotos, áudios, vídeos, documentos e localização em tempo real. Ações: assumir, transferir para outro atendente, devolver à fila (ou ao bot), encerrar e reabrir. Notas internas (não vão para o cliente), respostas rápidas com `/atalho`, anexos, etiquetas e nome do contato, e notificação do navegador para novas mensagens.
-- **Fluxos (bot):** editor visual de arrastar e soltar com blocos de mensagem, menu numerado, pergunta (com validação de número, e-mail ou telefone), condição, horário de atendimento, aguardar, requisição HTTP, etiqueta, transferir para atendente e fim. Variáveis como `{{contact.name}}` e as respostas guardadas. Simulador para testar o rascunho sem WhatsApp, validação com os problemas apontados no bloco, salvamento automático e publicação por versões (as sessões só usam a versão publicada). Para ligar: *Sessões → sessão → Bot*.
-  - Em qualquer ponto, palavras como "atendente" ou "humano" (configuráveis) transferem para a fila. Inatividade de 30 min (configurável) recomeça o fluxo.
-  - O bot só responde conversas com status *Com o bot*; ao assumir uma conversa, ele para. Grupos ficam fora do bot.
-- **Assistentes de IA (Claude):** escreva como atender e a base de conhecimento (horários, preços, políticas); a IA responde só com base nisso e transfere para a fila quando não souber, quando o cliente pedir uma pessoa ou em reclamações e pagamentos, deixando o motivo como nota interna. Modelo padrão **Claude Opus 5** (Sonnet 5 e Haiku 4.5 disponíveis, mais baratos), estilo de resposta (rápido/equilibrado/caprichado), limite de respostas por hora por conversa, playground para testar sem WhatsApp e custo estimado dos últimos 30 dias. Ligue em *Sessões → Bot* (IA atende tudo) ou use o bloco **IA** dentro de um fluxo (ex.: opção "Outros assuntos" do menu).
-  - Requer `ANTHROPIC_API_KEY` no `.env` (chave em platform.claude.com). Sem a chave, ou se a API falhar, a conversa vai para a fila.
-  - As instruções e a base de conhecimento ficam em cache na Anthropic entre as mensagens, o que barateia conversas longas. Com o Opus 5, se o modelo recusar uma resposta por segurança, a API tenta automaticamente um modelo de reserva.
-- **Configurações:** usuários (administradores e atendentes), respostas rápidas, chaves de API e troca de senha.
-- **Enviar mensagem:** teste de envio (texto, arquivo, localização, link) com o `curl` equivalente para a sua integração.
-- Tema claro/escuro e layout para celular.
-
-A imagem Docker já traz o painel compilado. Fora do Docker: `npm run web:install && npm run build`.
-Para desenvolver o painel com hot-reload: `npm run dev` (API na 3333) e, em outro terminal, `npm run web:dev` (abre na 5173, repassando `/api` e `/socket.io` para a 3333).
-
-## Usuários, chaves de API e tempo real
-
-- **Primeiro acesso:** defina `ADMIN_EMAIL` e `ADMIN_PASSWORD` no `.env` (o admin é criado no boot se não houver usuários) ou chame `POST /api/v1/auth/setup` com `{ "email", "name", "password" }`. Se `API_TOKEN` estiver definido, o setup exige esse token.
-- **Papéis:** `admin` (tudo), `agent` (atendente: conversas e contatos; não conecta sessões, não envia avulso e não usa as rotas antigas). Chaves de API (`mzk_...`, criadas em `POST /api/v1/api-keys`) servem para integrações e não gerenciam usuários.
-- **Quando a API exige autenticação:** se houver `API_TOKEN`, algum usuário ou alguma chave de API. Sem nada disso ela continua aberta como nas versões antigas (com aviso no log).
-- **Login do painel:** `POST /api/v1/auth/login` grava um cookie `httpOnly` e `SameSite=Strict`. Atrás de um proxy com HTTPS, use `COOKIE_SECURE=1`. Trocar a senha, mudar o papel ou desativar o usuário encerra os logins ativos.
-- **Tempo real:** Socket.IO em `/socket.io` (cookie do painel ou `auth: { token }` com a chave de API). Eventos: `sessions` (estado inicial), `session.state`, `session.qrcode` (só admin/integração), `message.saved`, `conversation.updated`, `contact.updated`.
-
-## API v1 e documentação
-
-- **Documentação interativa:** `http://localhost:3333/api/docs` (Swagger). A especificação OpenAPI 3.1 fica em `/api/openapi.json`. Clique em *Authorize* e informe uma chave de API ou o `API_TOKEN`.
-- Rotas em `/api/v1`: sessões (criar, iniciar, fechar, QR code), envio de mensagens (`text`, `file`, `voice`, `location`, `link`, `contact`), conversas, contatos e mídias.
-- Sucesso: `{ "data": ... }` (listas: `{ "data": [...], "meta": { "total", "limit", "offset" } }`). Erro: `{ "error": { "code", "message", "details" } }` com o status HTTP correspondente (400, 401, 404, 409 sessão desconectada, 502 falha no WhatsApp).
-- **Conversas novas:** com o bot desligado na sessão (padrão) ou sem fluxo publicado, a conversa já entra na fila de atendimento; com o bot ligado, começa com o bot. Responder pelo painel assume a conversa; responder uma conversa encerrada a reabre.
-- **Histórico:** toda mensagem recebida ou enviada (pela API, pelas rotas antigas ou pelo próprio celular) fica gravada com contato e conversa. As mídias recebidas são baixadas para `DATA_DIR/media` (limite `MEDIA_MAX_MB`, padrão 50).
-
-```bash
-curl -X POST http://localhost:3333/api/v1/sessions/session1/messages \
-  -H "Authorization: Bearer $API_TOKEN" -H "Content-Type: application/json" \
-  -d '{"to": "556334140378", "type": "text", "text": "Olá!"}'
-```
-
-As rotas antigas abaixo (`/start`, `/sendText`...) continuam funcionando como antes.
-
-## Setup manual (sem Docker)
-
-`sudo apt install -y curl git chromium fonts-liberation ca-certificates`
-- o pacote `chromium` instala as bibliotecas de sistema necessárias (libnss3, libgbm, libgtk-3...)
-
-`curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -`
-
-`sudo apt install -y nodejs`
-- Node.js 22 ou superior (24 LTS recomendado)
-
-`git clone https://github.com/billbarsch/myzap.git`
-
-`cd myzap`
-
-`PUPPETEER_SKIP_DOWNLOAD=true npm install`
-
-`cp .env_example .env`
-```
-Dentro do arquivo .env:
-Para usar o venom como motor use a variavel:
-ENGINE=VENOM
-Para usar o WPPCONNECT como motor use a variavel:
-ENGINE=WPPCONNECT
-Caminho do navegador:
-CHROME_PATH=/usr/bin/chromium
-```
-
-### Start server
-
-`npm start`
-
-### keep processes alive at every server restart
-
-`npm install -y pm2 -g`
-
-`pm2 start index.js`
-
-`pm2 startup`
-
-## Usage
-
-### Start new whatsapp session
-
-`http://localhost:3333/start?sessionName=session1`
-
-### Get QRCode (quickly!!)
-
-`http://localhost:3333/qrcode?sessionName=session1&image=true`
-- png
-
-`http://localhost:3333/qrcode?sessionName=session1`
-- json (base64)
-
-### Send message (POST method)
-
-```javascript
-(async () => {
-  const response = await fetch('http://localhost:3333/sendText', {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(
-        {
-            sessionName: "session1", 
-            number: '556334140378',
-            text:"Hello\nWorld"
-        }
-    )
-  });
-  const content = await response.json();
-
-  console.log(content);
-})();  
-```
-
-### Send File (POST method)
-
-```javascript
-(async () => {
-    const response = await fetch('http://localhost:3333/sendFile', {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(
-        {
-            sessionName: "session1", 
-            number: '556334140378',
-            base64Data:"44696d61", //hexadecimal
-            fileName:"test.txt",
-            caption: "Document" //optional
-        }
-    )
-  });
-  const content = await response.json();
-
-  console.log(content);
-})();  
-```
-
-### Close whatsapp session
-
-`http://localhost:3333/close?sessionName=session1`
-
-
-## Salvar token do venom na nuvem (jsonbin.io) (opcional)
- - Crie uma conta grátis no https://jsonbin.io/ 
- - Crie um novo "bin" (objeto json) com quaisquer dados e copie o id dele e coloque no arquivo .env
- - Copie também a sua "X-Master-Key" da api v3 do jsonbin.io e coloque no arquivo .env
- - Obs.: o venom-bot 5 e o login multidevice não expõem mais o token do navegador. Nesses casos o token não é salvo na nuvem; prefira manter o volume `tokens` persistente.
-
-```
-...
-JSONBINIO_BIN_ID=23452345345 <- deixar em branco caso não queira usar essa opção do jsonbin.io 
-JSONBINIO_SECRET_KEY=345234532452452345243 <- deixar em branco caso não queira usar essa opção do jsonbin.io
-...
-```
-
- - com esses dados o myzap irá gravar o token na nuvem e poderá ser executado em várias instancias diferentes por exemplo no Gooogle Cloud Run
-
-## To install certbot and create ssl certificate to https domains:
-
-`sudo apt-get update && sudo apt-get install -y software-properties-common`
-
-`sudo add-apt-repository universe && sudo add-apt-repository ppa:certbot/certbot`
-
-`sudo apt-get update && sudo apt-get install -y certbot`
-
-`sudo certbot certonly --manual --force-renewal -d *.yourdomain.net -d yourdomain.net --agree-tos --no-bootstrap --manual-public-ip-logging-ok --preferred-challenges dns-01 --server https://acme-v02.api.letsencrypt.org/directory`
+- Requer Node.js 22.12 ou superior (a imagem Docker usa Node 24).
+- O endpoint `POST /exec`, que executava comandos de shell no servidor, foi removido por segurança.
+- Parâmetros inválidos respondem HTTP 400 (antes respondiam 200 e, por exemplo, criavam uma sessão chamada `undefined`). Nomes de sessão aceitam só letras, números, `.`, `-` e `_`.
+- A API passa a exigir autenticação assim que existir um usuário ou uma chave de API. `?token=` ainda funciona para o `API_TOKEN`, mas está obsoleto.
+- Limite padrão de 600 requisições por minuto por IP.
+- O salvamento do token no jsonbin.io foi removido (não funciona com o WhatsApp multidevice). As sessões ficam no volume de tokens.
+- A resposta automática de demonstração `TESTEBOT` foi removida: use um fluxo ou um assistente de IA.
+- `ENGINE=VENOM` continua disponível, mas obsoleto.

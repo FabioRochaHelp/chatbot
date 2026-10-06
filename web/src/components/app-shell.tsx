@@ -4,6 +4,7 @@ import {
     BookOpen,
     Workflow,
     Sparkles,
+    Webhook,
     LayoutDashboard,
     LogOut,
     Menu,
@@ -39,7 +40,8 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
             ? [
                   { to: '/flows', label: 'Fluxos', icon: Workflow },
                   { to: '/ai', label: 'Assistentes de IA', icon: Sparkles },
-                  { to: '/send', label: 'Enviar mensagem', icon: Send }
+                  { to: '/send', label: 'Enviar mensagem', icon: Send },
+                  { to: '/webhooks', label: 'Webhooks', icon: Webhook }
               ]
             : []),
         { to: '/settings', label: 'Configurações', icon: Settings }

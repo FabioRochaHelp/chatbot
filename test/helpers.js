@@ -16,6 +16,8 @@ export const auth = server('../server/auth.js');
 export async function resetAll() {
     Sessions.sessions = [];
     history._sessionIds.clear();
+    await db().webhookDelivery.deleteMany();
+    await db().webhook.deleteMany();
     await db().session.deleteMany();
     await db().flow.deleteMany();
     await db().aiUsage.deleteMany();

@@ -16,7 +16,6 @@ function fakeSessions() {
         sendFile: vi.fn(async () => ({ result: 'success' })),
         sendLocation: vi.fn(async () => ({ result: 'success' })),
         checkNumberStatus: vi.fn(async () => ({ result: { numberExists: true } })),
-        clearCloudToken: vi.fn(async () => undefined),
         closeSession: vi.fn(async () => ({ result: 'success', message: 'CLOSED' }))
     };
 }
@@ -117,10 +116,10 @@ describe('rotas legadas', () => {
         expect(sessions.checkNumberStatus).toHaveBeenCalledWith('s1', '556334140378@c.us');
     });
 
-    it('GET /close limpa o token e fecha', async () => {
+    it('GET /close fecha a sessão', async () => {
         const res = await request(app).get('/close?sessionName=s1');
         expect(res.body).toEqual({ result: 'success', message: 'CLOSED' });
-        expect(sessions.clearCloudToken).toHaveBeenCalled();
+        expect(sessions.closeSession).toHaveBeenCalledWith('s1');
     });
 
     it('JSON inválido retorna 400 e erro do handler retorna 500', async () => {

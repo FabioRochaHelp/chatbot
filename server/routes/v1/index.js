@@ -8,6 +8,7 @@ const statsRoutes = require('./stats');
 const quickReplyRoutes = require('./quick-replies');
 const flowRoutes = require('./flows');
 const aiRoutes = require('./ai');
+const webhookRoutes = require('./webhooks');
 
 /** Router de /api/v1 e as rotas declaradas (para o OpenAPI). */
 module.exports = function v1Routes(deps) {
@@ -19,5 +20,6 @@ module.exports = function v1Routes(deps) {
     quickReplyRoutes(api, deps);
     flowRoutes(api, deps);
     aiRoutes(api, deps);
+    webhookRoutes(api, deps);
     return { router: api.finish(), routes: api.routes };
 };

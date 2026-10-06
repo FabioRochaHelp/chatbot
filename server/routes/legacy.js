@@ -126,7 +126,6 @@ module.exports = function legacyRoutes(Sessions) {
     router.get(
         '/close',
         validated(schemas.session, async ({ sessionName }) => {
-            await Sessions.clearCloudToken();
             return Sessions.closeSession(sessionName);
         })
     );

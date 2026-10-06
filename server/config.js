@@ -51,11 +51,5 @@ module.exports = {
     adminPassword: process.env.ADMIN_PASSWORD || null,
     https: process.env.HTTPS == 1,
     sslKeyPath: process.env.SSL_KEY_PATH,
-    sslCertPath: process.env.SSL_CERT_PATH,
-    jsonbinio: process.env.JSONBINIO_SECRET_KEY
-        ? {
-              binId: process.env.JSONBINIO_BIN_ID,
-              secretKey: process.env.JSONBINIO_SECRET_KEY
-          }
-        : null
+    sslCertPath: process.env.SSL_CERT_PATH
 };

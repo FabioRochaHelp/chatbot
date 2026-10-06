@@ -36,8 +36,7 @@ module.exports = {
             ...options,
             headless: true,
             browserArgs: BROWSER_ARGS,
-            browser: session.browser,
-            sessionToken: session.browserSessionToken || undefined
+            browser: session.browser
         });
     },
 

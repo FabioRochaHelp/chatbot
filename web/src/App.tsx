@@ -18,6 +18,8 @@ const FlowsPage = lazy(() => import('@/pages/flows').then(m => ({ default: m.Flo
 const FlowEditorPage = lazy(() => import('@/pages/flow-editor').then(m => ({ default: m.FlowEditorPage })));
 const AiAgentsPage = lazy(() => import('@/pages/ai-agents').then(m => ({ default: m.AiAgentsPage })));
 const AiAgentPage = lazy(() => import('@/pages/ai-agent').then(m => ({ default: m.AiAgentPage })));
+const WebhooksPage = lazy(() => import('@/pages/webhooks').then(m => ({ default: m.WebhooksPage })));
+const WebhookDetailPage = lazy(() => import('@/pages/webhook-detail').then(m => ({ default: m.WebhookDetailPage })));
 const NotFoundPage = lazy(() => import('@/pages/not-found').then(m => ({ default: m.NotFoundPage })));
 
 function Splash() {
@@ -70,6 +72,22 @@ export function App() {
                     element={
                         <ManagersOnly>
                             <FlowsPage />
+                        </ManagersOnly>
+                    }
+                />
+                <Route
+                    path="webhooks"
+                    element={
+                        <ManagersOnly>
+                            <WebhooksPage />
+                        </ManagersOnly>
+                    }
+                />
+                <Route
+                    path="webhooks/:id"
+                    element={
+                        <ManagersOnly>
+                            <WebhookDetailPage />
                         </ManagersOnly>
                     }
                 />

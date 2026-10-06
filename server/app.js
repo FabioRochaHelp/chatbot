@@ -5,6 +5,7 @@ const path = require('path');
 const express = require('express');
 const http = require('./http');
 const auth = require('./auth');
+const metrics = require('./metrics');
 const swaggerUi = require('swagger-ui-express');
 const legacyRoutes = require('./routes/legacy');
 const v1Routes = require('./routes/v1');
@@ -22,6 +23,7 @@ function createApp(deps = {}) {
     const app = express();
     app.disable('x-powered-by');
     app.set('trust proxy', config.trustProxy);
+    app.use(metrics.httpMiddleware);
     app.use(http.security(config));
     app.use(express.json({ limit: '20mb' }));
 
@@ -40,6 +42,11 @@ function createApp(deps = {}) {
     app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: 'MyZap API' }));
 
     app.use(auth.authenticate);
+    // Prometheus: chave de API (bearer_token no scrape), API_TOKEN ou admin
+    app.get('/metrics', auth.requireLegacyAccess(http.errorBody), async (req, res) => {
+        res.set('Content-Type', metrics.registry.contentType);
+        res.send(await metrics.registry.metrics());
+    });
     app.use('/api/v1', v1.router);
     app.use(auth.requireLegacyAccess(http.errorBody), legacyRoutes(Sessions));
 

@@ -9,6 +9,7 @@ const flows = require('./flows');
 const { botActive } = require('../bot-mode');
 const history = require('../history');
 const ai = require('./ai');
+const metrics = require('../metrics');
 
 // uma mensagem por vez em cada conversa (respostas rápidas em sequência não se atropelam)
 const queues = new Map();
@@ -68,7 +69,7 @@ async function applyEffects(conversation, effects) {
         if (effect.type === 'handoff') {
             data.status = 'pending';
             data.assignedUserId = null;
-            events.emit('conversation.handoff', { conversationId: conversation.id, reason: effect.reason });
+            data.handoffReason = effect.reason;
         }
         if (effect.type === 'end' && effect.close) {
             data.status = 'closed';
@@ -108,6 +109,7 @@ async function runAi(conversation, agentId) {
     const contact = { name: conversation.contact.name || conversation.contact.pushName || '' };
 
     let result;
+    const started = Date.now();
     try {
         result = await ai.respond(agent, history, { contact });
     } catch (error) {
@@ -120,6 +122,7 @@ async function runAi(conversation, agentId) {
         };
     }
     const { usage } = result;
+    metrics.recordAi(usage.model || agent.model, result.outcome, usage, (Date.now() - started) / 1000);
     await db().aiUsage.create({
         data: {
             agentId: agent.id,
@@ -210,11 +213,11 @@ function handle(Sessions, sessionName, message) {
         await sendReplies(Sessions, sessionName, contact, result.replies, conversation.id, aiAnswered ? 'ai' : 'bot');
         await noteEffects(conversation, result.effects);
         // Json? no Prisma: null precisa ser DbNull
-        const data = {
-            flowState: result.state ?? Prisma.DbNull,
-            ...(await applyEffects(conversation, result.effects))
-        };
-        await updateConversation(conversation.id, data);
+        const { handoffReason, ...changes } = await applyEffects(conversation, result.effects);
+        await updateConversation(conversation.id, { flowState: result.state ?? Prisma.DbNull, ...changes });
+        // avisado depois de gravar: quem ouve (webhooks) lê o status novo
+        if (handoffReason)
+            events.emit('conversation.handoff', { conversationId: conversation.id, reason: handoffReason });
         return result;
     });
 }

@@ -18,20 +18,6 @@ const CLOSE_TIMEOUT = 5000;
 // intervalo entre as sessões restauradas no boot (cada uma abre um Chromium)
 const RESTORE_INTERVAL = 1500;
 
-// API v3 do jsonbin.io (a v2 "/b/<id>" + "secret-key" foi descontinuada)
-const jsonbin = {
-    url: () => 'https://api.jsonbin.io/v3/b/' + config.jsonbinio.binId,
-    headers: () => ({ 'Content-Type': 'application/json', 'X-Master-Key': config.jsonbinio.secretKey }),
-    async get() {
-        const response = await axios.get(jsonbin.url() + '/latest', { headers: jsonbin.headers() });
-        return response.data.record;
-    },
-    async put(data) {
-        const response = await axios.put(jsonbin.url(), data, { headers: jsonbin.headers() });
-        return response.data;
-    }
-};
-
 module.exports = class Sessions {
     static async start(sessionName) {
         Sessions.sessions = Sessions.sessions || []; //start array
@@ -110,22 +96,6 @@ module.exports = class Sessions {
 
     static async initSession(sessionName, generation) {
         var session = Sessions.getSession(sessionName);
-        session.browserSessionToken = null;
-        if (config.jsonbinio) {
-            //se informou secret key pra salvar na nuvem
-            //busca token da session na nuvem
-            try {
-                const record = await jsonbin.get();
-                if (record && record.WAToken1 !== undefined) {
-                    session.browserSessionToken = record;
-                    log.info({ session: sessionName }, 'token carregado da nuvem');
-                } else {
-                    log.info({ session: sessionName }, 'não havia token na nuvem');
-                }
-            } catch (error) {
-                log.warn({ err: error }, 'jsonbin.io');
-            }
-        } //if jsonbinio
 
         const catchQR = (base64Qrimg, asciiQR, attempts, urlCode) => {
             if (session.generation !== generation) return;
@@ -177,10 +147,6 @@ module.exports = class Sessions {
             session.state = state;
             store.setLastState(sessionName, state);
             events.emit('session.state', { session: sessionName, state });
-            if (state == 'CONNECTED' && config.jsonbinio && session.browserSessionToken == undefined) {
-                //salva dados do token da sessão na nuvem
-                setTimeout(() => Sessions.saveCloudToken(client), 2000);
-            }
             log.info({ session: sessionName, state: state }, 'onStateChange');
         });
         // onAnyMessage também traz o que foi enviado pelo celular (fromMe)
@@ -206,31 +172,6 @@ module.exports = class Sessions {
             }
         });
     } //setup
-
-    static async saveCloudToken(client) {
-        // o venom 5 (e o login multidevice) não expõe mais o token do navegador
-        if (typeof client.getSessionTokenBrowser !== 'function') {
-            log.info('engine sem getSessionTokenBrowser: token não será salvo na nuvem');
-            return;
-        }
-        try {
-            log.info('gravando token na nuvem');
-            const browserSessionToken = await client.getSessionTokenBrowser();
-            await jsonbin.put(browserSessionToken);
-        } catch (error) {
-            log.warn({ err: error }, 'jsonbin.io');
-        }
-    } //saveCloudToken
-
-    static async clearCloudToken() {
-        if (!config.jsonbinio) return;
-        try {
-            log.info('limpando token na nuvem');
-            await jsonbin.put({ nada: 'nada' });
-        } catch (error) {
-            log.warn({ err: error }, 'jsonbin.io');
-        }
-    } //clearCloudToken
 
     /**
      * Fecha a sessão. Fechar pela API desliga o autoStart; no shutdown do servidor
