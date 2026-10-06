@@ -1,34 +1,54 @@
-version: "3.5"
 services:
-  myzapdev:
-    build: 
+  myzap:
+    build:
       context: .
-      target: myzapdev
-    container_name: myzapdev
-    working_dir: /usr/src/app
+      target: prod
+    image: myzap:latest
+    container_name: myzap
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 3333
+    ports:
+      - "${PORT:-3333}:3333"
     volumes:
-      - ${PATH_LOCAL}:/usr/src/app
-    ports:
-      - 3333:${HOST_PORT}
-    stdin_open: true # docker run -i
-    tty: true        # docker run -t
+      - myzap_tokens:/usr/src/app/tokens
+    shm_size: 1gb
+    restart: unless-stopped
+    stop_grace_period: 30s
     networks:
       backend:
         aliases:
-          - myzapdev
+          - myzap
 
-  myzapprod:
-    build: 
+  myzap-dev:
+    profiles: [dev]
+    build:
       context: .
-      target: myzapprod
-    container_name: myzapprod
-#    image: gcr.io/maisagil/myzap
+      target: dev
+    container_name: myzap-dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 3333
     ports:
-      - 3333:${HOST_PORT}
+      - "${PORT:-3333}:3333"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    shm_size: 1gb
+    stdin_open: true
+    tty: true
     networks:
       backend:
         aliases:
-          - myzapprod
+          - myzap-dev
+
+volumes:
+  myzap_tokens:
+
 networks:
   backend:
     name: myzapnetwork

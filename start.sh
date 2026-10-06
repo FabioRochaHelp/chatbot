@@ -1,2 +1,2 @@
 #!/bin/bash
-docker-compose up myzapdev
+docker compose --profile dev up --build myzap-dev

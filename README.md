@@ -9,21 +9,42 @@
 
 Este projeto usa como base o [Venom-bot](https://github.com/orkestral/venom) ou o [WPPCONNECT](https://github.com/wppconnect-team/wppconnect), um navegador virtual sem interface gráfica que abre o whatsapp web e executa todos os comandos via código possibilitando assim a automação de todas as funções.
 
-## Setup
+## Docker (recomendado)
 
-`sudo apt install -y curl nano gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils wget build-essential apt-transport-https libgbm-dev`
-- para instalar todas as dependencias necessárias no sistema
+A imagem (`node:20-bookworm-slim` + Chromium do Debian) já traz todas as dependências de sistema.
 
-`curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -`
+```bash
+git clone https://github.com/billbarsch/myzap.git
+cd myzap
+cp .env_example .env      # ajuste ENGINE, API_TOKEN etc.
+docker compose up -d --build
+```
 
-`sudo apt install -y git nodejs`
-- para instalar git, nodejs
+- A API sobe em `http://localhost:3333` (troque a porta do host com `PORT` no `.env`).
+- As sessões ficam no volume `myzap_tokens`, então reiniciar o container não exige ler o QR code de novo.
+- Variáveis do `.env`:
+  - `ENGINE=WPPCONNECT` (padrão) ou `ENGINE=VENOM`. Obs.: o venom-bot não tem releases desde 11/2024 e, em testes de 10/2026, abre o WhatsApp Web mas não gera o QR code. Prefira o WPPCONNECT.
+  - `API_TOKEN=<segredo>`: protege todas as rotas (exceto `/`). Envie `Authorization: Bearer <segredo>` ou `?token=<segredo>`.
+- Desenvolvimento com hot-reload (código montado no container): `docker compose --profile dev up --build myzap-dev`
+- Logs: `docker compose logs -f myzap`
+
+> O endpoint `POST /exec`, que executava comandos de shell no servidor, foi removido por segurança.
+
+## Setup manual (sem Docker)
+
+`sudo apt install -y curl git chromium fonts-liberation ca-certificates`
+- o pacote `chromium` instala as bibliotecas de sistema necessárias (libnss3, libgbm, libgtk-3...)
+
+`curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -`
+
+`sudo apt install -y nodejs`
+- Node.js 20 ou superior
 
 `git clone https://github.com/billbarsch/myzap.git`
 
 `cd myzap`
 
-`npm install`
+`PUPPETEER_SKIP_DOWNLOAD=true npm install`
 
 `cp .env_example .env`
 ```
@@ -32,11 +53,13 @@ Para usar o venom como motor use a variavel:
 ENGINE=VENOM
 Para usar o WPPCONNECT como motor use a variavel:
 ENGINE=WPPCONNECT
+Caminho do navegador:
+CHROME_PATH=/usr/bin/chromium
 ```
 
 ### Start server
 
-`node index.js`
+`npm start`
 
 ### keep processes alive at every server restart
 
@@ -118,7 +141,8 @@ ENGINE=WPPCONNECT
 ## Salvar token do venom na nuvem (jsonbin.io) (opcional)
  - Crie uma conta grátis no https://jsonbin.io/ 
  - Crie um novo "bin" (objeto json) com quaisquer dados e copie o id dele e coloque no arquivo .env
- - Copie também o seu token de acesso à api do jsonbin.io e coloque no arquivo .env
+ - Copie também a sua "X-Master-Key" da api v3 do jsonbin.io e coloque no arquivo .env
+ - Obs.: o venom-bot 5 e o login multidevice não expõem mais o token do navegador. Nesses casos o token não é salvo na nuvem; prefira manter o volume `tokens` persistente.
 
 ```
 ...

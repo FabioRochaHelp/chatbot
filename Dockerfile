@@ -1,63 +1,34 @@
-FROM ubuntu:18.04 AS myzapdev
+FROM node:20-bookworm-slim AS base
+# o chromium do Debian traz como dependência todas as libs de sistema
+# (libnss3, libgbm, libgtk-3, libx*, libasound2...) que o README lista para o puppeteer
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    CHROME_PATH=/usr/bin/chromium \
+    TOKENS_DIR=/usr/src/app/tokens \
+    NODE_ENV=production
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        chromium \
+        fonts-liberation \
+        fonts-noto-color-emoji \
+        ca-certificates \
+        tini \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/src/app
-RUN apt-get update && apt-get install -y \
-    gconf-service \
-    libasound2 \
-    libatk1.0-0 \
-    libc6 \
-    libcairo2 \
-    libcups2 \
-    libexpat1 \
-    libfontconfig1 \
-    libgcc1 \
-    libgconf-2-4 \
-    libgdk-pixbuf2.0-0 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libstdc++6 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
-    ca-certificates \
-    fonts-liberation \
-    libappindicator1 \
-    libnss3 \
-    lsb-release \
-    xdg-utils \
-    wget \
-    build-essential \
-    apt-transport-https \
-    libgbm-dev \
-    && apt-get install curl -y \
-    && curl -sL https://deb.nodesource.com/setup_10.x | bash - \
-    && apt-get install -y \
-    git \
-    nodejs
-#COPY package*.json ./
-#COPY .env-example ./.env
-#RUN npm install
 EXPOSE 3333
-CMD npm install ; node index.js
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
-FROM myzapdev AS myzapprod
-WORKDIR /usr/src/app
+# desenvolvimento: código montado via volume (docker-compose, profile dev)
+FROM base AS dev
+ENV NODE_ENV=development
+CMD ["sh", "-c", "npm install && npm run dev"]
+
+FROM base AS prod
 COPY package*.json ./
-RUN npm install
+RUN npm ci --omit=dev && npm cache clean --force
 COPY . .
-#RUN rm -rf .env
-COPY .env.prod ./.env
-EXPOSE 3333
-CMD node index.js
+RUN mkdir -p tokens && chown -R node:node /usr/src/app
+USER node
+VOLUME ["/usr/src/app/tokens"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
+    CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3333)).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "index.js"]

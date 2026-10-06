@@ -1,53 +1,39 @@
-const util = require('util');
-const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const https = require('https');
 const express = require("express");
 const cors = require('cors');
+const config = require('./config');
 const Sessions = require("./sessions");
-require('dotenv').config();
 
 var app = express();
 
 app.use(cors());
-// app.use(timeout(120000));
-// app.use(haltOnTimedout);
 app.use(express.json({
-    limit: '20mb',
-    extended: true
+    limit: '20mb'
 }));
 
-var appPort = process.env.PORT ? process.env.PORT : 3333;
-
-if (process.env.HTTPS == 1) { //with ssl
-    https.createServer(
-        {
-            key: fs.readFileSync(process.env.SSL_KEY_PATH),
-            cert: fs.readFileSync(process.env.SSL_CERT_PATH)
-        },
-        app).listen(appPort);
-    console.log("Https server running on port " + appPort);
-} else { //http
-    app.listen(appPort, () => {
-        console.log("Http server running on port " + appPort);
-    });
-}//http
+// parâmetros podem vir na query (GET) ou no body (POST / clientes antigos)
+function param(req, name) {
+    return req.query[name] !== undefined ? req.query[name] : (req.body || {})[name];
+}
 
 app.get("/", async (req, res, next) => {
     var result = { "result": "ok" };
     res.json(result);
 });//
 
-app.post('/exec', async (req, res) => {
-    const { stdout, stderr } = await exec(req.body.command);
-    res.send(stdout);
+// autenticação opcional: Authorization: Bearer <API_TOKEN> ou ?token=<API_TOKEN>
+app.use((req, res, next) => {
+    if (!config.apiToken) return next();
+    const header = req.get('Authorization') || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : req.query.token;
+    if (token === config.apiToken) return next();
+    res.status(401).json({ result: 'error', message: 'UNAUTHORIZED' });
 });
 
 app.get("/start", async (req, res, next) => {
     console.log("starting..." + req.query.sessionName);
-    var session = process.env.JSONBINIO_SECRET_KEY ?
-        await Sessions.start(req.query.sessionName, { jsonbinio_secret_key: process.env.JSONBINIO_SECRET_KEY, jsonbinio_bin_id: process.env.JSONBINIO_BIN_ID }) :
-        await Sessions.start(req.query.sessionName);
+    var session = await Sessions.start(req.query.sessionName);
     if (["CONNECTED", "QRCODE", "STARTING"].includes(session.state)) {
         res.status(200).json({ result: 'success', message: session.state });
     } else {
@@ -57,7 +43,6 @@ app.get("/start", async (req, res, next) => {
 
 app.get("/status", async (req, res, next) => {
     var session = await Sessions.getStatus(req.query.sessionName);
-    console.log(session);
     res.status(200).json({
         result: (!session.state) ? 'NOT_FOUND' : session.state
     });
@@ -70,8 +55,10 @@ app.get("/qrcode", async (req, res, next) => {
     if (session != false) {
         if (session.status != 'isLogged') {
             if (req.query.image) {
-                session.qrcode = session.qrcode.replace('data:image/png;base64,', '');
-                const imageBuffer = Buffer.from(session.qrcode, 'base64');
+                if (!session.qrcode) {
+                    return res.status(200).json({ result: "error", message: session.state });
+                }
+                const imageBuffer = Buffer.from(session.qrcode.replace('data:image/png;base64,', ''), 'base64');
                 res.writeHead(200, {
                     'Content-Type': 'image/png',
                     'Content-Length': imageBuffer.length
@@ -165,83 +152,68 @@ app.post("/sendLocation", async (req, res, next) => {
 }); //sendLocation
 
 app.get("/getAllChatsNewMsg", async (req, res, next) => {
-    var result = await Sessions.getAllChatsNewMsg(req.body.sessionName);
+    var result = await Sessions.getAllChatsNewMsg(param(req, 'sessionName'));
     res.json(result);
 }); //getAllChatsNewMsg
 
 app.get("/getAllUnreadMessages", async (req, res, next) => {
-    var result = await Sessions.getAllUnreadMessages(req.body.sessionName);
+    var result = await Sessions.getAllUnreadMessages(param(req, 'sessionName'));
     res.json(result);
 }); //getAllUnreadMessages
 
 app.get("/checkNumberStatus", async (req, res, next) => {
     var result = await Sessions.checkNumberStatus(
-        req.query.sessionName,
-        req.query.number
+        param(req, 'sessionName'),
+        param(req, 'number')
     );
     res.json(result);
 }); //Verifica Numero
 
 app.get("/getNumberProfile", async (req, res, next) => {
     var result = await Sessions.getNumberProfile(
-        req.body.sessionName,
-        req.body.number
+        param(req, 'sessionName'),
+        param(req, 'number')
     );
     res.json(result);
 }); //Verifica perfil
 
 app.get("/close", async (req, res, next) => {
-    if (typeof(Sessions.options) != "undefined")  {
-        if (Sessions.options.jsonbinio_secret_key !== undefined) {//se informou secret key pra salvar na nuvem
-            console.log("limpando token na nuvem...");
-            //salva dados do token da sessão na nuvem
-            var data = JSON.stringify({ "nada": "nada" });
-            var config = {
-                method: 'put',
-                url: 'https://api.jsonbin.io/b/' + Sessions.options.jsonbinio_bin_id,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'secret-key': Sessions.options.jsonbinio_secret_key,
-                    'versioning': 'false'
-                },
-                data: data
-            };
-            await axios(config)
-                .then(function (response) {
-                    console.log(JSON.stringify(response.data));
-                })
-                .catch(function (error) {
-                    console.log(error);
-                });
-        }
-    }
+    await Sessions.clearCloudToken();
     var result = await Sessions.closeSession(req.query.sessionName);
     res.json(result);
 });//close
 
-process.stdin.resume();//so the program will not close instantly
+var server;
+if (config.https) { //with ssl
+    server = https.createServer(
+        {
+            key: fs.readFileSync(config.sslKeyPath),
+            cert: fs.readFileSync(config.sslCertPath)
+        },
+        app).listen(config.port, '0.0.0.0');
+    console.log("Https server running on port " + config.port + " (engine " + config.engine + ")");
+} else { //http
+    server = app.listen(config.port, '0.0.0.0', () => {
+        console.log("Http server running on port " + config.port + " (engine " + config.engine + ")");
+    });
+}//http
 
-async function exitHandler(options, exitCode) {
-    if (options.cleanup) {
-        console.log('cleanup');
-        await Sessions.getSessions().forEach(async session => {
-            await Sessions.closeSession(session.sessionName);
-        });
-    }
-    if (exitCode || exitCode === 0) {
-        console.log(exitCode);
-    }
+var shuttingDown = false;
+async function shutdown(signal, exitCode = 0) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(signal + ': fechando sessões...');
+    server.close();
+    await Promise.all(Sessions.getSessions().map(session => Sessions.closeSession(session.name)));
+    process.exit(exitCode);
+} //shutdown
 
-    if (options.exit) {
-        process.exit();
-    }
-} //exitHandler 
-//do something when app is closing
-process.on('exit', exitHandler.bind(null, { cleanup: true }));
-//catches ctrl+c event
-process.on('SIGINT', exitHandler.bind(null, { exit: true }));
-// catches "kill pid" (for example: nodemon restart)
-process.on('SIGUSR1', exitHandler.bind(null, { exit: true }));
-process.on('SIGUSR2', exitHandler.bind(null, { exit: true }));
-//catches uncaught exceptions
-process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
+// SIGTERM: docker stop / kill; SIGINT: ctrl+c; SIGUSR2: nodemon restart
+['SIGTERM', 'SIGINT', 'SIGUSR2'].forEach(signal => process.on(signal, () => shutdown(signal)));
+process.on('uncaughtException', error => {
+    console.error(error);
+    shutdown('uncaughtException', 1);
+});
+process.on('unhandledRejection', error => {
+    console.error('unhandledRejection:', error);
+});

@@ -1,2 +1,2 @@
 #!/bin/bash
-docker-compose exec myzapdev ../../../bin/bash
+docker compose exec myzap-dev bash
