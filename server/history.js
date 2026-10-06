@@ -33,6 +33,8 @@ const EXTENSIONS = {
 };
 
 const sessionIds = new Map();
+// nome de quem enviou (atendente), para o inbox
+const SENT_BY = { sentBy: { select: { id: true, name: true } } };
 
 async function sessionId(name) {
     if (!sessionIds.has(name)) {
@@ -107,7 +109,11 @@ async function save(sessionName, fields, meta = {}) {
         orderBy: { id: 'desc' }
     });
     if (!conversation) {
-        conversation = await db().conversation.create({ data: { sessionId: sid, contactId: contact.id } });
+        // sem bot configurado a conversa já nasce aguardando atendente
+        const { botMode } = await db().session.findUnique({ where: { id: sid }, select: { botMode: true } });
+        conversation = await db().conversation.create({
+            data: { sessionId: sid, contactId: contact.id, status: botMode === 'off' ? 'pending' : 'bot' }
+        });
     }
 
     const data = {
@@ -134,7 +140,9 @@ async function save(sessionName, fields, meta = {}) {
             // a origem informada pela API/bot vale mais que a inferida pelo evento do WhatsApp
             const update = meta.origin ? { origin, sentByUserId: data.sentByUserId } : {};
             if (data.mediaPath && !existing.mediaPath) update.mediaPath = data.mediaPath;
-            message = Object.keys(update).length ? await db().message.update({ where: key, data: update }) : existing;
+            message = Object.keys(update).length
+                ? await db().message.update({ where: key, data: update, include: SENT_BY })
+                : existing;
         }
     }
     if (!message) {
@@ -144,7 +152,8 @@ async function save(sessionName, fields, meta = {}) {
                 sessionId: sid,
                 conversationId: conversation.id,
                 waMessageId: fields.waMessageId
-            }
+            },
+            include: SENT_BY
         });
     }
 
@@ -194,7 +203,14 @@ async function recordIncoming(sessionName, message, client) {
             const buffer = await client.decryptFile(message);
             if (buffer.length <= config.mediaMaxBytes) {
                 const mediaPath = writeMedia(sessionName, fields.waMessageId, buffer, fields.mimeType, fields.fileName);
-                return db().message.update({ where: { id: saved.id }, data: { mediaPath } });
+                const updated = await db().message.update({
+                    where: { id: saved.id },
+                    data: { mediaPath },
+                    include: SENT_BY
+                });
+                // a mensagem já foi exibida; avisa que a mídia ficou disponível
+                events.emit('message.updated', { session: sessionName, message: updated });
+                return updated;
             }
             log.warn({ session: sessionName, size: buffer.length }, 'mídia acima de MEDIA_MAX_MB: não gravada');
         }
@@ -237,4 +253,32 @@ async function recordOutgoing(sessionName, to, content, sent, meta = {}) {
     }
 }
 
-module.exports = { normalize, recordIncoming, recordOutgoing, mediaAbsolutePath, _sessionIds: sessionIds };
+/** Nota interna do atendente: fica no histórico da conversa, não vai para o WhatsApp. */
+async function addNote(conversation, text, userId) {
+    const message = await db().message.create({
+        data: {
+            sessionId: conversation.sessionId,
+            conversationId: conversation.id,
+            direction: 'note',
+            origin: 'agent',
+            type: 'note',
+            body: text,
+            sentByUserId: userId || null
+        },
+        include: SENT_BY
+    });
+    const contact = await db().contact.findUnique({ where: { id: conversation.contactId } });
+    const session = await db().session.findUnique({ where: { id: conversation.sessionId }, select: { name: true } });
+    events.emit('message.saved', { session: session.name, message, conversation, contact });
+    return message;
+}
+
+module.exports = {
+    normalize,
+    recordIncoming,
+    recordOutgoing,
+    addNote,
+    mediaAbsolutePath,
+    SENT_BY,
+    _sessionIds: sessionIds
+};

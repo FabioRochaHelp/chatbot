@@ -1,11 +1,24 @@
 import { Suspense, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
-import { BookOpen, LayoutDashboard, LogOut, Menu, Monitor, Moon, Send, Smartphone, Sun } from 'lucide-react';
+import {
+    BookOpen,
+    LayoutDashboard,
+    LogOut,
+    Menu,
+    MessagesSquare,
+    Monitor,
+    Moon,
+    Send,
+    Settings,
+    Smartphone,
+    Sun
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, SheetContent } from '@/components/ui/dialog';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth, useLogout } from '@/lib/auth';
+import { useStats } from '@/lib/queries';
 import { useRealtime } from '@/lib/realtime-context';
 import { useTheme, type Theme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -14,14 +27,18 @@ const ROLE_LABEL = { admin: 'Administrador', agent: 'Atendente', integration: 'I
 
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
     const { canManage } = useAuth();
+    const { data: stats } = useStats();
+    const queue = stats?.conversations.pending ?? 0;
     const items = [
         { to: '/', label: 'Painel', icon: LayoutDashboard, end: true },
+        { to: '/inbox', label: 'Atendimento', icon: MessagesSquare, badge: queue },
         { to: '/sessions', label: 'Sessões', icon: Smartphone },
-        ...(canManage ? [{ to: '/send', label: 'Enviar mensagem', icon: Send }] : [])
+        ...(canManage ? [{ to: '/send', label: 'Enviar mensagem', icon: Send }] : []),
+        { to: '/settings', label: 'Configurações', icon: Settings }
     ];
     return (
         <nav className="grid gap-0.5" aria-label="Principal">
-            {items.map(({ to, label, icon: Icon, end }) => (
+            {items.map(({ to, label, icon: Icon, end, badge }) => (
                 <NavLink
                     key={to}
                     to={to}
@@ -35,7 +52,16 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
                     }
                 >
                     <Icon className="size-4" aria-hidden />
-                    {label}
+                    <span className="flex-1">{label}</span>
+                    {badge ? (
+                        <span
+                            className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning"
+                            title={`${badge} aguardando atendente`}
+                        >
+                            <span className="sr-only">Aguardando atendente: </span>
+                            {badge}
+                        </span>
+                    ) : null}
                 </NavLink>
             ))}
         </nav>
@@ -153,6 +179,8 @@ function PageSkeleton() {
 export function AppShell() {
     const [menuOpen, setMenuOpen] = useState(false);
     const location = useLocation();
+    // o atendimento ocupa a tela toda (lista + conversa + contato)
+    const wide = location.pathname.startsWith('/inbox');
     return (
         <div className="min-h-dvh lg:grid lg:grid-cols-[248px_1fr]">
             <aside className="sticky top-0 hidden h-dvh border-r bg-card lg:block">
@@ -171,7 +199,10 @@ export function AppShell() {
                     </Dialog>
                     <Logo />
                 </header>
-                <main key={location.pathname} className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+                <main
+                    key={wide ? 'inbox' : location.pathname}
+                    className={wide ? 'w-full' : 'mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8'}
+                >
                     <Suspense fallback={<PageSkeleton />}>
                         <Outlet />
                     </Suspense>

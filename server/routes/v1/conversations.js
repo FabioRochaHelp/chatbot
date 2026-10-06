@@ -13,7 +13,15 @@ const schemas = require('./schemas');
 
 const listConversations = z.object({
     session: z.string().optional().describe('nome da sessão'),
-    status: schemas.status.optional(),
+    status: z
+        .string()
+        .regex(/^(bot|pending|open|closed)(,(bot|pending|open|closed))*$/)
+        .optional()
+        .describe('um ou mais status separados por vírgula, ex.: pending,open'),
+    assigned: z
+        .union([z.enum(['me', 'none']), z.coerce.number().int().positive()])
+        .optional()
+        .describe('me (minhas), none (sem atendente) ou id do usuário'),
     contact: z.coerce.number().int().positive().optional().describe('id do contato'),
     q: z.string().max(100).optional().describe('busca por nome ou número do contato'),
     ...pagination
@@ -35,7 +43,8 @@ function contactSearch(q) {
 const withContact = {
     contact: true,
     session: { select: { name: true } },
-    messages: { orderBy: { id: 'desc' }, take: 1 }
+    assignedUser: { select: { id: true, name: true } },
+    messages: { where: { direction: { not: 'note' } }, orderBy: { id: 'desc' }, take: 1 }
 };
 
 function conversationView(conversation) {
@@ -43,11 +52,33 @@ function conversationView(conversation) {
     return { ...rest, session: session.name, lastMessage: messages[0] || null };
 }
 
+/** Atendente ativo ou AppError. */
+async function activeUser(id) {
+    const user = await db().user.findUnique({ where: { id } });
+    if (!user || !user.active) throw new AppError(400, 'INVALID_ASSIGNEE', 'atendente inexistente ou desativado');
+    return user;
+}
+
 module.exports = function conversationRoutes({ define }, { Sessions }) {
     async function findConversation(id) {
         const conversation = await db().conversation.findUnique({ where: { id }, include: withContact });
         if (!conversation) throw new AppError(404, 'CONVERSATION_NOT_FOUND', 'conversa não encontrada');
         return conversation;
+    }
+
+    async function updateConversation(id, data) {
+        await db().conversation.update({ where: { id }, data });
+        const conversation = conversationView(await findConversation(id));
+        events.emit('conversation.updated', { conversation });
+        return conversation;
+    }
+
+    // marca como lida também no celular (melhor esforço: sessão pode estar desconectada)
+    function sendSeen(conversation) {
+        messaging
+            .connectedClient(Sessions, conversation.session.name)
+            .then(client => typeof client.sendSeen === 'function' && client.sendSeen(conversation.contact.waId))
+            .catch(() => null);
     }
 
     define(
@@ -58,10 +89,17 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             summary: 'Lista conversas (mais recentes primeiro)',
             query: listConversations
         },
-        async ({ query }) => {
+        async ({ query }, req) => {
+            let assignedUserId;
+            if (query.assigned === 'me') {
+                if (!req.principal.user) throw new AppError(400, 'NOT_A_USER', 'assigned=me exige login de usuário');
+                assignedUserId = req.principal.user.id;
+            } else if (query.assigned === 'none') assignedUserId = null;
+            else if (query.assigned) assignedUserId = query.assigned;
             const where = {
                 ...(query.session ? { session: { name: query.session } } : {}),
-                ...(query.status ? { status: query.status } : {}),
+                ...(query.status ? { status: { in: query.status.split(',') } } : {}),
+                ...(assignedUserId !== undefined ? { assignedUserId } : {}),
                 ...(query.contact ? { contactId: query.contact } : {}),
                 ...(query.q ? { contact: contactSearch(query.q) } : {})
             };
@@ -95,22 +133,54 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             method: 'patch',
             path: '/conversations/:id',
             tags: ['Conversas'],
-            summary: 'Altera status ou marca como lida',
+            summary: 'Assume, transfere, devolve ao bot, encerra ou marca como lida',
+            description:
+                'status=open sem assignedUserId atribui a quem chamou. bot/pending tiram o atendente. ' +
+                'Exemplos: assumir {status:"open"}; transferir {status:"open",assignedUserId:2}; ' +
+                'devolver ao bot {status:"bot"}; encerrar {status:"closed"}.',
             params: schemas.idParams,
             body: schemas.updateConversation
         },
-        async ({ params, body }) => {
-            await findConversation(params.id);
+        async ({ params, body }, req) => {
+            const current = await findConversation(params.id);
             const data = {};
+            if (body.assignedUserId !== undefined) {
+                if (body.assignedUserId !== null) await activeUser(body.assignedUserId);
+                data.assignedUserId = body.assignedUserId;
+            }
             if (body.status) {
                 data.status = body.status;
                 data.closedAt = body.status === 'closed' ? new Date() : null;
+                if (body.status === 'bot' || body.status === 'pending') {
+                    data.assignedUserId = null;
+                } else if (body.status === 'open' && data.assignedUserId === undefined) {
+                    if (req.principal.user) data.assignedUserId = req.principal.user.id;
+                    else if (!current.assignedUserId) {
+                        throw new AppError(400, 'ASSIGNEE_REQUIRED', 'informe assignedUserId para abrir o atendimento');
+                    }
+                }
             }
-            if (body.read) data.unreadCount = 0;
-            await db().conversation.update({ where: { id: params.id }, data });
-            const conversation = conversationView(await findConversation(params.id));
-            events.emit('conversation.updated', { conversation });
-            return conversation;
+            if (body.read) {
+                data.unreadCount = 0;
+                sendSeen(current);
+            }
+            return updateConversation(params.id, data);
+        }
+    );
+
+    define(
+        {
+            method: 'post',
+            path: '/conversations/:id/notes',
+            status: 201,
+            tags: ['Conversas'],
+            summary: 'Nota interna (não vai para o WhatsApp)',
+            params: schemas.idParams,
+            body: z.object({ text: z.string().trim().min(1).max(4000) })
+        },
+        async ({ params, body }, req) => {
+            const conversation = await findConversation(params.id);
+            return history.addNote(conversation, body.text, req.principal.user && req.principal.user.id);
         }
     );
 
@@ -128,6 +198,7 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             await findConversation(params.id);
             const rows = await db().message.findMany({
                 where: { conversationId: params.id, ...(query.before ? { id: { lt: query.before } } : {}) },
+                include: history.SENT_BY,
                 orderBy: { id: 'desc' },
                 take: query.limit + 1
             });
@@ -143,16 +214,29 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             status: 201,
             tags: ['Conversas'],
             summary: 'Responde na conversa',
+            description:
+                'Resposta de um usuário do painel assume a conversa (status open) e reabre se estiver encerrada.',
             params: schemas.idParams,
             body: schemas.content
         },
-        async ({ params, body }) => {
+        async ({ params, body }, req) => {
             const conversation = await findConversation(params.id);
+            const user = req.principal.user;
+            if (user && (conversation.status !== 'open' || !conversation.assignedUserId)) {
+                // garante que a resposta caia nesta conversa (uma encerrada abriria outra)
+                await updateConversation(conversation.id, {
+                    status: 'open',
+                    closedAt: null,
+                    assignedUserId: conversation.assignedUserId || user.id
+                });
+            } else if (conversation.status === 'closed') {
+                await updateConversation(conversation.id, { status: 'bot', closedAt: null });
+            }
             return messaging.send(
                 Sessions,
                 conversation.session.name,
                 { ...body, to: conversation.contact.waId },
-                { origin: 'api' }
+                user ? { origin: 'agent', sentByUserId: user.id } : { origin: 'api' }
             );
         }
     );

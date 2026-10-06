@@ -237,6 +237,22 @@ module.exports = function authRoutes({ define }) {
         }
     );
 
+    define(
+        {
+            method: 'get',
+            path: '/users/directory',
+            tags: ['Usuários'],
+            summary: 'Atendentes ativos (para transferir conversas)',
+            description: 'Disponível para todos os papéis: só id, nome e papel.'
+        },
+        () =>
+            db().user.findMany({
+                where: { active: true },
+                select: { id: true, name: true, role: true },
+                orderBy: { name: 'asc' }
+            })
+    );
+
     // ---------- chaves de API ----------
 
     const keys = { tags: ['Chaves de API'], roles: ROLES.admin };

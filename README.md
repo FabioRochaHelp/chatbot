@@ -61,6 +61,8 @@ Abra `http://localhost:3333` no navegador. No primeiro acesso o painel pede para
 
 - **Painel:** sessões conectadas, conversas aguardando atendente, não lidas e mensagens dos últimos 7 dias.
 - **Sessões:** criar, conectar lendo o QR code (atualiza ao vivo), reconectar e fechar.
+- **Atendimento (inbox):** filas *Fila* (aguardando atendente), *Minhas*, *Abertas* e *Encerradas*, busca por nome/número, chat com fotos, áudios, vídeos, documentos e localização em tempo real. Ações: assumir, transferir para outro atendente, devolver à fila (ou ao bot), encerrar e reabrir. Notas internas (não vão para o cliente), respostas rápidas com `/atalho`, anexos, etiquetas e nome do contato, e notificação do navegador para novas mensagens.
+- **Configurações:** usuários (administradores e atendentes), respostas rápidas, chaves de API e troca de senha.
 - **Enviar mensagem:** teste de envio (texto, arquivo, localização, link) com o `curl` equivalente para a sua integração.
 - Tema claro/escuro e layout para celular.
 
@@ -80,6 +82,7 @@ Para desenvolver o painel com hot-reload: `npm run dev` (API na 3333) e, em outr
 - **Documentação interativa:** `http://localhost:3333/api/docs` (Swagger). A especificação OpenAPI 3.1 fica em `/api/openapi.json`. Clique em *Authorize* e informe uma chave de API ou o `API_TOKEN`.
 - Rotas em `/api/v1`: sessões (criar, iniciar, fechar, QR code), envio de mensagens (`text`, `file`, `voice`, `location`, `link`, `contact`), conversas, contatos e mídias.
 - Sucesso: `{ "data": ... }` (listas: `{ "data": [...], "meta": { "total", "limit", "offset" } }`). Erro: `{ "error": { "code", "message", "details" } }` com o status HTTP correspondente (400, 401, 404, 409 sessão desconectada, 502 falha no WhatsApp).
+- **Conversas novas:** com o bot desligado na sessão (padrão), a conversa já entra na fila de atendimento. Responder pelo painel assume a conversa; responder uma conversa encerrada a reabre.
 - **Histórico:** toda mensagem recebida ou enviada (pela API, pelas rotas antigas ou pelo próprio celular) fica gravada com contato e conversa. As mídias recebidas são baixadas para `DATA_DIR/media` (limite `MEDIA_MAX_MB`, padrão 50).
 
 ```bash

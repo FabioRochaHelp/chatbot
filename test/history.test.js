@@ -65,9 +65,16 @@ describe('history.recordIncoming', () => {
         const contact = await db().contact.findFirst({ include: { conversations: true } });
         expect(contact).toMatchObject({ waId: '556334140378@c.us', pushName: 'Maria' });
         expect(contact.conversations).toHaveLength(1);
-        expect(contact.conversations[0]).toMatchObject({ status: 'bot', unreadCount: 2 });
+        // sessão sem bot (botMode off): conversa nasce aguardando atendente
+        expect(contact.conversations[0]).toMatchObject({ status: 'pending', unreadCount: 2 });
         expect(await db().message.count()).toBe(2);
         expect(seen.map(event => event.message.body)).toEqual(['Olá!', 'tudo bem?']);
+    });
+
+    it('com bot ativo, a conversa nasce com o bot', async () => {
+        await db().session.create({ data: { name: 'bot1', engine: 'WPPCONNECT', botMode: 'flow' } });
+        await history.recordIncoming('bot1', incoming());
+        expect((await db().conversation.findFirst()).status).toBe('bot');
     });
 
     it('não grava duplicado nem eventos de sistema/status', async () => {
@@ -86,14 +93,19 @@ describe('history.recordIncoming', () => {
         expect(await db().conversation.count()).toBe(2);
     });
 
-    it('baixa a mídia para DATA_DIR/media', async () => {
+    it('baixa a mídia para DATA_DIR/media e avisa com message.updated', async () => {
         const client = fakeClient();
+        const updates = [];
+        const listener = event => updates.push(event);
+        events.on('message.updated', listener);
         const saved = await history.recordIncoming(
             's1',
             incoming({ type: 'image', mimetype: 'image/jpeg', id: 'false_img_1' }),
             client
         );
         expect(client.decryptFile).toHaveBeenCalled();
+        events.off('message.updated', listener);
+        expect(updates[0].message.mediaPath).toBe(saved.mediaPath);
         expect(saved.mediaPath).toMatch(/^s1\/\d{4}-\d{2}\/false_img_1\.jpg$/);
         expect(fs.readFileSync(history.mediaAbsolutePath(saved.mediaPath), 'utf8')).toBe('media-bytes');
     });

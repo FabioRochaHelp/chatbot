@@ -54,6 +54,8 @@ export type Page<T> = { data: T[]; meta: { total: number; limit: number; offset:
 export const api = {
     get: async <T>(path: string) => (await request<{ data: T }>(path)).data,
     page: <T>(path: string) => request<Page<T>>(path),
+    /** Resposta completa ({ data, meta }) com tipo próprio. */
+    raw: <T>(path: string) => request<T>(path),
     post: async <T>(path: string, body?: unknown, options: Omit<Options, 'method' | 'body'> = {}) =>
         (await request<{ data: T }>(path, { method: 'POST', body: body ?? {}, ...options })).data,
     patch: async <T>(path: string, body: unknown) => (await request<{ data: T }>(path, { method: 'PATCH', body })).data,

@@ -10,7 +10,7 @@ const log = require('./logger');
  * Socket.IO em /socket.io. Autentica pelo cookie do painel ou por auth.token
  * (chave de API / API_TOKEN). Salas: "all" (todos), "managers" (admin/integração), "user:<id>".
  *
- * Eventos enviados: session.state, session.qrcode (só managers), message.saved,
+ * Eventos enviados: session.state, session.qrcode (só managers), message.saved, message.updated,
  * conversation.updated, contact.updated.
  */
 function attach(httpServer, { Sessions }) {
@@ -52,6 +52,7 @@ function attach(httpServer, { Sessions }) {
         'session.state': payload => io.to('all').emit('session.state', payload),
         'session.qrcode': payload => io.to('managers').emit('session.qrcode', payload),
         'message.saved': payload => io.to('all').emit('message.saved', payload),
+        'message.updated': payload => io.to('all').emit('message.updated', payload),
         'conversation.updated': payload => io.to('all').emit('conversation.updated', payload),
         'contact.updated': payload => io.to('all').emit('contact.updated', payload),
         // senha trocada, usuário desativado/removido: derruba as conexões abertas

@@ -68,6 +68,7 @@ model Conversation {
   // bot | pending (aguardando atendente) | open (com atendente) | closed
   status         String    @default("bot")
   assignedUserId Int?
+  assignedUser   User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
   // estado do motor de fluxos (nó atual, variáveis)
   flowState      Json?
   unreadCount    Int       @default(0)
@@ -87,7 +88,7 @@ model Message {
   conversationId Int
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   waMessageId    String?
-  // in (recebida) | out (enviada)
+  // in (recebida) | out (enviada) | note (nota interna, não vai para o WhatsApp)
   direction      String
   // contact | phone (enviada pelo celular) | api | bot | agent
   origin         String
@@ -103,6 +104,7 @@ model Message {
   // dados extras por tipo (localização, vcard, link)
   payload        Json?
   sentByUserId   Int?
+  sentBy         User?        @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
   timestamp      DateTime     @default(now())
   createdAt      DateTime     @default(now())
 
@@ -112,20 +114,22 @@ model Message {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
-  email        String    @unique
-  name         String
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  name          String
   // scrypt$N$r$p$salt$hash
-  passwordHash String
+  passwordHash  String
   // admin | agent
-  role         String    @default("agent")
-  active       Boolean   @default(true)
+  role          String         @default("agent")
+  active        Boolean        @default(true)
   // incrementado ao trocar senha/desativar: invalida os logins ativos
-  tokenVersion Int       @default(0)
-  lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  apiKeys      ApiKey[]
+  tokenVersion  Int            @default(0)
+  lastLoginAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  apiKeys       ApiKey[]
+  conversations Conversation[]
+  messages      Message[]
 }
 
 model ApiKey {
@@ -140,4 +144,13 @@ model ApiKey {
   lastUsedAt  DateTime?
   revokedAt   DateTime?
   createdAt   DateTime  @default(now())
+}
+
+model QuickReply {
+  id        Int      @id @default(autoincrement())
+  // atalho digitado no chat depois de "/", ex.: "horario"
+  shortcut  String   @unique
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

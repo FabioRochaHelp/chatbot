@@ -72,7 +72,7 @@ describe('GET /api/v1/stats', () => {
         expect(res.status).toBe(200);
         const stats = res.body.data;
         expect(stats.sessions).toEqual({ total: 1, connected: 1 });
-        expect(stats.conversations).toEqual({ bot: 1, pending: 1, open: 0 });
+        expect(stats.conversations).toEqual({ bot: 0, pending: 2, open: 0 });
         expect(stats.unread).toBe(3);
         expect(stats.messagesToday).toEqual({ in: 2, out: 1 });
         expect(stats.messagesByDay).toHaveLength(7);
