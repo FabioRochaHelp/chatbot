@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, LoaderCircle, Power, Send } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { SessionStateBadge } from '@/components/session-state';
@@ -8,11 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/queries';
 import { useRealtime } from '@/lib/realtime-context';
+import type { FlowSummary } from '@/lib/flow-types';
 import type { Session } from '@/lib/types';
 
 function useSessionMutation(name: string, action: (name: string) => Promise<Session>) {
@@ -139,6 +142,64 @@ function Connection({ session }: { session: Session }) {
     );
 }
 
+function BotSettings({ session }: { session: Session }) {
+    const queryClient = useQueryClient();
+    const { data: flows } = useQuery({ queryKey: ['flows'], queryFn: () => api.get<FlowSummary[]>('/flows') });
+    const save = useMutation({
+        mutationFn: (value: string) =>
+            api.patch<Session>(
+                path(session.name),
+                value === 'off' ? { botMode: 'off' } : { botMode: 'flow', flowId: Number(value) }
+            ),
+        onSuccess: updated => {
+            queryClient.setQueryData(['sessions', session.name], updated);
+            queryClient.invalidateQueries({ queryKey: ['sessions'], exact: true });
+            toast.success(
+                updated.botMode === 'off'
+                    ? 'Bot desligado: novas conversas vão direto para a fila'
+                    : `Bot ligado com o fluxo “${updated.flow?.name}”`
+            );
+        },
+        onError: error => toast.error(error instanceof ApiError ? error.message : 'Não foi possível alterar.')
+    });
+    const value = session.botMode.includes('flow') && session.flow ? String(session.flow.id) : 'off';
+
+    return (
+        <div className="grid gap-2 border-t pt-4">
+            <label htmlFor="bot-flow" className="text-sm font-medium">
+                Bot
+            </label>
+            <Select
+                id="bot-flow"
+                value={value}
+                disabled={save.isPending}
+                onChange={event => save.mutate(event.target.value)}
+            >
+                <option value="off">Desligado (tudo vai para a fila)</option>
+                {flows?.map(flow => (
+                    <option key={flow.id} value={flow.id} disabled={flow.version === 0}>
+                        Fluxo: {flow.name}
+                        {flow.version === 0 ? ' (publique antes)' : ''}
+                    </option>
+                ))}
+            </Select>
+            {value !== 'off' && session.flow && (
+                <Link
+                    to={'/flows/' + session.flow.id}
+                    className="text-[13px] text-primary underline-offset-4 hover:underline"
+                >
+                    Editar o fluxo “{session.flow.name}”
+                </Link>
+            )}
+            {flows && flows.length === 0 && (
+                <Link to="/flows" className="text-[13px] text-primary underline-offset-4 hover:underline">
+                    Criar um fluxo
+                </Link>
+            )}
+        </div>
+    );
+}
+
 function Settings({ session }: { session: Session }) {
     const { canManage } = useAuth();
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -177,6 +238,7 @@ function Settings({ session }: { session: Session }) {
                         </dd>
                     </div>
                 </dl>
+                {canManage && <BotSettings session={session} />}
                 {canManage && session.state !== 'CLOSED' && (
                     <div className="border-t pt-4">
                         <Button

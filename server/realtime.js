@@ -54,6 +54,7 @@ function attach(httpServer, { Sessions }) {
         'message.saved': payload => io.to('all').emit('message.saved', payload),
         'message.updated': payload => io.to('all').emit('message.updated', payload),
         'conversation.updated': payload => io.to('all').emit('conversation.updated', payload),
+        'conversations.changed': payload => io.to('all').emit('conversations.changed', payload),
         'contact.updated': payload => io.to('all').emit('contact.updated', payload),
         // senha trocada, usuário desativado/removido: derruba as conexões abertas
         'user.revoked': ({ userId }) => io.in('user:' + userId).disconnectSockets(true)

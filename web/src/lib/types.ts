@@ -22,6 +22,7 @@ export type Session = {
     engine: string | null;
     autoStart: boolean | null;
     botMode: string;
+    flow: { id: number; name: string; version: number } | null;
     hasQrcode: boolean;
     createdAt: string | null;
     updatedAt: string | null;

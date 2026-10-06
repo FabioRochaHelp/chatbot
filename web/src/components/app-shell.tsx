@@ -2,6 +2,7 @@ import { Suspense, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import {
     BookOpen,
+    Workflow,
     LayoutDashboard,
     LogOut,
     Menu,
@@ -33,7 +34,12 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
         { to: '/', label: 'Painel', icon: LayoutDashboard, end: true },
         { to: '/inbox', label: 'Atendimento', icon: MessagesSquare, badge: queue },
         { to: '/sessions', label: 'Sessões', icon: Smartphone },
-        ...(canManage ? [{ to: '/send', label: 'Enviar mensagem', icon: Send }] : []),
+        ...(canManage
+            ? [
+                  { to: '/flows', label: 'Fluxos', icon: Workflow },
+                  { to: '/send', label: 'Enviar mensagem', icon: Send }
+              ]
+            : []),
         { to: '/settings', label: 'Configurações', icon: Settings }
     ];
     return (
@@ -180,7 +186,7 @@ export function AppShell() {
     const [menuOpen, setMenuOpen] = useState(false);
     const location = useLocation();
     // o atendimento ocupa a tela toda (lista + conversa + contato)
-    const wide = location.pathname.startsWith('/inbox');
+    const wide = location.pathname.startsWith('/inbox') || /^\/flows\/\d+/.test(location.pathname);
     return (
         <div className="min-h-dvh lg:grid lg:grid-cols-[248px_1fr]">
             <aside className="sticky top-0 hidden h-dvh border-r bg-card lg:block">
@@ -200,7 +206,7 @@ export function AppShell() {
                     <Logo />
                 </header>
                 <main
-                    key={wide ? 'inbox' : location.pathname}
+                    key={location.pathname.startsWith('/inbox') ? 'inbox' : location.pathname}
                     className={wide ? 'w-full' : 'mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8'}
                 >
                     <Suspense fallback={<PageSkeleton />}>

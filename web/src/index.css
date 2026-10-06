@@ -95,3 +95,24 @@
         @apply outline-2 outline-offset-2 outline-ring;
     }
 }
+
+/* React Flow com as cores do tema */
+.react-flow {
+    --xy-background-color: var(--muted);
+    --xy-background-pattern-dots-color: var(--input);
+    --xy-edge-stroke: var(--muted-foreground);
+    --xy-edge-stroke-width: 1.5;
+    --xy-edge-stroke-selected: var(--primary);
+    --xy-connectionline-stroke: var(--primary);
+    --xy-controls-button-background-color: var(--card);
+    --xy-controls-button-background-color-hover: var(--muted);
+    --xy-controls-button-color: var(--foreground);
+    --xy-controls-button-border-color: var(--border);
+    --xy-minimap-background-color: var(--card);
+    --xy-minimap-mask-background-color: color-mix(in oklab, var(--muted) 70%, transparent);
+    --xy-minimap-node-background-color: var(--input);
+}
+.react-flow__controls,
+.react-flow__minimap {
+    @apply overflow-hidden rounded-lg border shadow-xs;
+}

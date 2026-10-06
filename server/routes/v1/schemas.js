@@ -35,7 +35,11 @@ module.exports = {
         autoStart: z.boolean().default(true),
         botMode: z.enum(botModes).default('off')
     }),
-    updateSession: z.object({ autoStart: z.boolean().optional(), botMode: z.enum(botModes).optional() }),
+    updateSession: z.object({
+        autoStart: z.boolean().optional(),
+        botMode: z.enum(botModes).optional(),
+        flowId: z.number().int().positive().nullable().optional().describe('fluxo usado quando botMode inclui flow')
+    }),
     qrcodeQuery: z.object({ format: z.enum(['json', 'png']).default('json') }),
     status: z.enum(statuses),
     statuses,

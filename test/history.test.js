@@ -71,10 +71,15 @@ describe('history.recordIncoming', () => {
         expect(seen.map(event => event.message.body)).toEqual(['Olá!', 'tudo bem?']);
     });
 
-    it('com bot ativo, a conversa nasce com o bot', async () => {
-        await db().session.create({ data: { name: 'bot1', engine: 'WPPCONNECT', botMode: 'flow' } });
+    it('com fluxo publicado, a conversa nasce com o bot; sem fluxo publicado, na fila', async () => {
+        const flow = await db().flow.create({ data: { name: 'f', definition: {}, published: { nodes: [] } } });
+        await db().session.create({ data: { name: 'bot1', engine: 'WPPCONNECT', botMode: 'flow', flowId: flow.id } });
         await history.recordIncoming('bot1', incoming());
-        expect((await db().conversation.findFirst()).status).toBe('bot');
+        expect((await db().conversation.findFirst({ where: { session: { name: 'bot1' } } })).status).toBe('bot');
+
+        await db().session.create({ data: { name: 'bot2', engine: 'WPPCONNECT', botMode: 'flow' } });
+        await history.recordIncoming('bot2', incoming());
+        expect((await db().conversation.findFirst({ where: { session: { name: 'bot2' } } })).status).toBe('pending');
     });
 
     it('não grava duplicado nem eventos de sistema/status', async () => {

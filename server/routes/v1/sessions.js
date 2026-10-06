@@ -5,8 +5,12 @@ const messaging = require('../../messaging');
 const { AppError } = require('../../errors');
 const schemas = require('./schemas');
 const { ROLES } = require('./router');
+const events = require('../../events');
+const { botActive } = require('../../bot-mode');
+const { Prisma } = require('@prisma/client');
 
 const tags = ['Sessões'];
+const WITH_FLOW = { flow: { select: { id: true, name: true, version: true, published: true } } };
 // atendentes só consultam; criar, conectar, fechar e enviar avulso é de admin/integração
 const manage = ROLES.manage;
 
@@ -17,6 +21,7 @@ function view(row, memory) {
         engine: row ? row.engine : null,
         autoStart: row ? row.autoStart : null,
         botMode: row ? row.botMode : 'off',
+        flow: row && row.flow ? { id: row.flow.id, name: row.flow.name, version: row.flow.version } : null,
         hasQrcode: Boolean(memory && memory.state === 'QRCODE' && memory.qrcode),
         createdAt: row ? row.createdAt : null,
         updatedAt: row ? row.updatedAt : null
@@ -25,7 +30,7 @@ function view(row, memory) {
 
 module.exports = function sessionRoutes({ define }, { Sessions }) {
     async function find(name) {
-        const row = await db().session.findUnique({ where: { name } });
+        const row = await db().session.findUnique({ where: { name }, include: WITH_FLOW });
         const memory = Sessions.getSession(name) || null;
         if (!row && !memory) throw new AppError(404, 'SESSION_NOT_FOUND', 'sessão não encontrada');
         return { row, memory };
@@ -37,7 +42,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
     }
 
     define({ method: 'get', path: '/sessions', tags, summary: 'Lista as sessões' }, async () => {
-        const rows = await db().session.findMany({ orderBy: { id: 'asc' } });
+        const rows = await db().session.findMany({ orderBy: { id: 'asc' }, include: WITH_FLOW });
         const names = new Set(rows.map(row => row.name));
         return [
             ...rows.map(row => view(row, Sessions.getSession(row.name) || null)),
@@ -86,7 +91,24 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
         async ({ params, body }) => {
             const { row } = await find(params.name);
             if (!row) throw new AppError(404, 'SESSION_NOT_FOUND', 'sessão não encontrada no banco');
-            await db().session.update({ where: { name: params.name }, data: body });
+            if (body.flowId) {
+                const flow = await db().flow.findUnique({ where: { id: body.flowId } });
+                if (!flow) throw new AppError(400, 'FLOW_NOT_FOUND', 'fluxo não encontrado');
+            }
+            const botMode = body.botMode ?? row.botMode;
+            const flowId = body.flowId !== undefined ? body.flowId : row.flowId;
+            if (botMode.includes('flow') && !flowId) {
+                throw new AppError(400, 'FLOW_REQUIRED', 'escolha um fluxo para ligar o bot de fluxo');
+            }
+            const updated = await db().session.update({ where: { name: params.name }, data: body, include: WITH_FLOW });
+            if (!botActive(updated)) {
+                // bot desligado: quem estava com o bot vai para a fila
+                const moved = await db().conversation.updateMany({
+                    where: { sessionId: updated.id, status: 'bot' },
+                    data: { status: 'pending', flowState: Prisma.DbNull }
+                });
+                if (moved.count) events.emit('conversations.changed', { session: params.name });
+            }
             return current(params.name);
         }
     );

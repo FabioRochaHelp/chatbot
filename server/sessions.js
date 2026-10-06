@@ -6,6 +6,7 @@ const engine = require('./engine');
 const store = require('./store');
 const history = require('./history');
 const messaging = require('./messaging');
+const pipeline = require('./pipeline');
 const events = require('./events');
 const { AppError } = require('./errors');
 const log = require('./logger');
@@ -184,9 +185,13 @@ module.exports = class Sessions {
         });
         // onAnyMessage também traz o que foi enviado pelo celular (fromMe)
         if (typeof client.onAnyMessage === 'function') {
-            client.onAnyMessage(message => {
+            client.onAnyMessage(async message => {
                 if (session.generation !== generation) return;
-                history.recordIncoming(sessionName, message, client);
+                const saved = await history.recordIncoming(sessionName, message, client);
+                // bot (fluxo) responde mensagens recebidas em conversas com status "bot"
+                pipeline
+                    .handle(Sessions, sessionName, saved)
+                    .catch(error => log.error({ session: sessionName, err: error }, 'erro no pipeline'));
             });
         }
         client.onMessage(async message => {
@@ -198,8 +203,6 @@ module.exports = class Sessions {
                     .catch(error =>
                         log.warn({ session: sessionName, hook: session.hook, err: error.message }, 'hook falhou')
                     );
-            } else if (message.body == 'TESTEBOT') {
-                client.sendText(message.from, 'Hello\nfriend!');
             }
         });
     } //setup

@@ -5,6 +5,7 @@ const path = require('path');
 const config = require('./config');
 const { db } = require('./db');
 const events = require('./events');
+const { botActive, BOT_SESSION_SELECT } = require('./bot-mode');
 const log = require('./logger');
 
 // avisos de sistema que não são conversa
@@ -109,10 +110,10 @@ async function save(sessionName, fields, meta = {}) {
         orderBy: { id: 'desc' }
     });
     if (!conversation) {
-        // sem bot configurado a conversa já nasce aguardando atendente
-        const { botMode } = await db().session.findUnique({ where: { id: sid }, select: { botMode: true } });
+        // sem bot ativo (desligado ou sem fluxo publicado) a conversa já nasce aguardando atendente
+        const session = await db().session.findUnique({ where: { id: sid }, select: BOT_SESSION_SELECT });
         conversation = await db().conversation.create({
-            data: { sessionId: sid, contactId: contact.id, status: botMode === 'off' ? 'pending' : 'bot' }
+            data: { sessionId: sid, contactId: contact.id, status: botActive(session) ? 'bot' : 'pending' }
         });
     }
 

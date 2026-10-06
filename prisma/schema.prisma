@@ -14,6 +14,9 @@ model Session {
   autoStart     Boolean        @default(true)
   // off | flow | ai | flow+ai (usado pelo pipeline do chatbot)
   botMode       String         @default("off")
+  // fluxo usado quando botMode inclui "flow"
+  flowId        Int?
+  flow          Flow?          @relation(fields: [flowId], references: [id], onDelete: SetNull)
   lastState     String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -153,4 +156,19 @@ model QuickReply {
   text      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Flow {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  // rascunho editado no painel: { nodes, edges, settings }
+  definition  Json
+  // versão em uso pelas sessões (null = nunca publicado)
+  published   Json?
+  version     Int       @default(0)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sessions    Session[]
 }

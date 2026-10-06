@@ -14,6 +14,8 @@ const SessionDetailPage = lazy(() => import('@/pages/session-detail').then(m => 
 const SendPage = lazy(() => import('@/pages/send').then(m => ({ default: m.SendPage })));
 const InboxPage = lazy(() => import('@/pages/inbox').then(m => ({ default: m.InboxPage })));
 const SettingsPage = lazy(() => import('@/pages/settings').then(m => ({ default: m.SettingsPage })));
+const FlowsPage = lazy(() => import('@/pages/flows').then(m => ({ default: m.FlowsPage })));
+const FlowEditorPage = lazy(() => import('@/pages/flow-editor').then(m => ({ default: m.FlowEditorPage })));
 const NotFoundPage = lazy(() => import('@/pages/not-found').then(m => ({ default: m.NotFoundPage })));
 
 function Splash() {
@@ -61,6 +63,22 @@ export function App() {
                 <Route path="inbox" element={<InboxPage />} />
                 <Route path="inbox/:id" element={<InboxPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route
+                    path="flows"
+                    element={
+                        <ManagersOnly>
+                            <FlowsPage />
+                        </ManagersOnly>
+                    }
+                />
+                <Route
+                    path="flows/:id"
+                    element={
+                        <ManagersOnly>
+                            <FlowEditorPage />
+                        </ManagersOnly>
+                    }
+                />
                 <Route path="sessions" element={<SessionsPage />} />
                 <Route path="sessions/:name" element={<SessionDetailPage />} />
                 <Route
