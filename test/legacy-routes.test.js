@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import request from 'supertest';
-import { createApp } from './helpers.js';
+import { createApp, resetAll, useApiToken } from './helpers.js';
 
-const baseConfig = { apiToken: null, corsOrigins: [], rateLimit: 0, trustProxy: false };
 const PNG = 'data:image/png;base64,' + Buffer.from('fake-png').toString('base64');
 
 function fakeSessions() {
@@ -22,13 +21,15 @@ function fakeSessions() {
     };
 }
 
+beforeAll(resetAll);
+
 describe('rotas legadas', () => {
     let sessions;
     let app;
 
     beforeEach(() => {
         sessions = fakeSessions();
-        app = createApp({ config: baseConfig, sessions });
+        app = createApp({ sessions });
     });
 
     it('GET / responde ok sem autenticação', async () => {
@@ -142,7 +143,8 @@ describe('rotas legadas', () => {
 });
 
 describe('autenticação', () => {
-    const app = createApp({ config: { ...baseConfig, apiToken: 'segredo' }, sessions: fakeSessions() });
+    useApiToken({ beforeAll, afterAll }, 'segredo');
+    const app = createApp({ sessions: fakeSessions() });
 
     it('bloqueia sem token, mas libera GET /', async () => {
         expect((await request(app).get('/status?sessionName=s1')).status).toBe(401);

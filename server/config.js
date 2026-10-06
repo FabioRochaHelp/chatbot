@@ -39,6 +39,14 @@ module.exports = {
     mediaMaxBytes: (parseInt(process.env.MEDIA_MAX_MB, 10) || 50) * 1024 * 1024,
     chromePath: process.env.CHROME_PATH || undefined,
     apiToken: process.env.API_TOKEN || null,
+    // segredo do login do painel; vazio = gerado e salvo em DATA_DIR/jwt-secret
+    jwtSecret: process.env.JWT_SECRET || null,
+    sessionTtlHours: parseInt(process.env.SESSION_TTL_HOURS, 10) || 168,
+    // cookie só por HTTPS; padrão: ligado se HTTPS=1 (atrás de proxy com TLS, use COOKIE_SECURE=1)
+    cookieSecure: process.env.COOKIE_SECURE !== undefined ? process.env.COOKIE_SECURE === '1' : process.env.HTTPS == 1,
+    // cria este admin no boot se ainda não houver usuários
+    adminEmail: process.env.ADMIN_EMAIL || null,
+    adminPassword: process.env.ADMIN_PASSWORD || null,
     https: process.env.HTTPS == 1,
     sslKeyPath: process.env.SSL_KEY_PATH,
     sslCertPath: process.env.SSL_CERT_PATH,

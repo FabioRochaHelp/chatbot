@@ -6,6 +6,7 @@ const { z } = require('zod');
 const { db } = require('../../db');
 const messaging = require('../../messaging');
 const history = require('../../history');
+const events = require('../../events');
 const { AppError } = require('../../errors');
 const { pagination } = require('./router');
 const schemas = require('./schemas');
@@ -107,7 +108,9 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             }
             if (body.read) data.unreadCount = 0;
             await db().conversation.update({ where: { id: params.id }, data });
-            return conversationView(await findConversation(params.id));
+            const conversation = conversationView(await findConversation(params.id));
+            events.emit('conversation.updated', { conversation });
+            return conversation;
         }
     );
 
@@ -197,7 +200,9 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
         },
         async ({ params, body }) => {
             await findContact(params.id);
-            return db().contact.update({ where: { id: params.id }, data: body });
+            const contact = await db().contact.update({ where: { id: params.id }, data: body });
+            events.emit('contact.updated', { contact });
+            return contact;
         }
     );
 

@@ -109,3 +109,34 @@ model Message {
   @@unique([sessionId, waMessageId])
   @@index([conversationId, id])
 }
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  name         String
+  // scrypt$N$r$p$salt$hash
+  passwordHash String
+  // admin | agent
+  role         String    @default("agent")
+  active       Boolean   @default(true)
+  // incrementado ao trocar senha/desativar: invalida os logins ativos
+  tokenVersion Int       @default(0)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  apiKeys      ApiKey[]
+}
+
+model ApiKey {
+  id          Int       @id @default(autoincrement())
+  name        String
+  // primeiros caracteres, para identificar a chave na listagem
+  prefix      String
+  // sha256 da chave (a chave em si só é mostrada na criação)
+  keyHash     String    @unique
+  createdById Int?
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+}

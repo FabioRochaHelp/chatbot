@@ -8,7 +8,7 @@ export default [
         files: ['**/*.js'],
         languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
         rules: {
-            'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none' }]
+            'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none', ignoreRestSiblings: true }]
         }
     },
     {

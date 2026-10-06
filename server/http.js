@@ -1,6 +1,5 @@
 'use strict';
 
-const crypto = require('crypto');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -32,31 +31,6 @@ function validated(schema, fn) {
         const result = await fn(parsed.data, req, res);
         if (result !== undefined && !res.headersSent) res.json(result);
     });
-}
-
-function safeEqual(a, b) {
-    const bufA = Buffer.from(String(a));
-    const bufB = Buffer.from(String(b));
-    return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
-}
-
-// autenticação opcional: Authorization: Bearer <API_TOKEN> ou ?token=<API_TOKEN>
-function auth(apiToken) {
-    let warnedQueryToken = false;
-    return (req, res, next) => {
-        if (!apiToken) return next();
-        const header = req.get('Authorization') || '';
-        let token = header.startsWith('Bearer ') ? header.slice(7) : null;
-        if (!token && req.query.token) {
-            token = req.query.token;
-            if (!warnedQueryToken) {
-                warnedQueryToken = true;
-                log.warn('token via ?token= está obsoleto (fica em logs e histórico); use Authorization: Bearer');
-            }
-        }
-        if (token && safeEqual(token, apiToken)) return next();
-        res.status(401).json(errorBody(req, 'UNAUTHORIZED', 'token ausente ou inválido'));
-    };
 }
 
 function security(config) {
@@ -103,4 +77,4 @@ function errorHandler(error, req, res, next) {
     res.status(500).json({ result: 'error', message: error.message || 'INTERNAL_ERROR' });
 }
 
-module.exports = { asyncHandler, validated, auth, security, notFound, errorHandler };
+module.exports = { asyncHandler, validated, errorBody, security, notFound, errorHandler };

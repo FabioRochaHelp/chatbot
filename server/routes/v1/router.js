@@ -9,11 +9,19 @@ function issues(error) {
     return error.issues.map(issue => ({ field: issue.path.join('.'), message: issue.message }));
 }
 
+// papéis: admin (usuário admin, API_TOKEN ou API aberta), agent (atendente), integration (chave de API)
+const ROLES = {
+    all: ['admin', 'agent', 'integration'],
+    manage: ['admin', 'integration'],
+    admin: ['admin']
+};
+
 /**
  * Router da API v1: cada rota declara params/query/body em zod, que servem para validar
  * e para gerar o OpenAPI. O handler recebe { params, query, body } validados e retorna:
  * - um objeto/array: vira { data } (ou { data, meta } se vier { data, meta })
  * - undefined: o handler já respondeu (ex.: arquivo)
+ * spec.public: não exige login; spec.roles: papéis permitidos (padrão: todos); spec.middleware: extras.
  */
 function createRouter() {
     const router = express.Router();
@@ -21,9 +29,15 @@ function createRouter() {
 
     function define(spec, handler) {
         routes.push(spec);
+        const roles = spec.roles || ROLES.all;
         router[spec.method](
             spec.path,
+            ...(spec.middleware || []),
             asyncHandler(async (req, res) => {
+                if (!spec.public) {
+                    if (!req.principal) throw new AppError(401, 'UNAUTHORIZED', 'token ausente ou inválido');
+                    if (!roles.includes(req.principal.role)) throw new AppError(403, 'FORBIDDEN', 'sem permissão');
+                }
                 const input = {};
                 for (const part of ['params', 'query', 'body']) {
                     if (!spec[part]) continue;
@@ -72,4 +86,4 @@ const pagination = {
     offset: z.coerce.number().int().min(0).default(0)
 };
 
-module.exports = { createRouter, errorHandler, pagination };
+module.exports = { createRouter, errorHandler, pagination, ROLES };

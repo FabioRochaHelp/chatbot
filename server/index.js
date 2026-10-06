@@ -8,6 +8,8 @@ const Sessions = require('./sessions');
 const { createApp } = require('./app');
 const { disconnect } = require('./db');
 const { migrate } = require('./migrate');
+const realtime = require('./realtime');
+const auth = require('./auth');
 
 migrate();
 
@@ -34,7 +36,10 @@ if (config.https) {
     });
 } //http
 
-server.once('listening', () => {
+realtime.attach(server, { Sessions });
+
+server.once('listening', async () => {
+    await auth.seedAdmin().catch(error => log.error({ err: error }, 'falha ao criar o administrador inicial'));
     Sessions.restore().catch(error => log.error({ err: error }, 'falha ao restaurar sessões'));
 });
 

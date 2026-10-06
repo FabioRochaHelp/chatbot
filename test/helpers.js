@@ -9,12 +9,29 @@ export const history = server('../server/history.js');
 export const events = server('../server/events.js');
 export const { db, disconnect } = server('../server/db.js');
 export const { createApp } = server('../server/app.js');
+export const config = server('../server/config.js');
+export const auth = server('../server/auth.js');
 
 /** Zera o banco e as sessões em memória. */
 export async function resetAll() {
     Sessions.sessions = [];
     history._sessionIds.clear();
     await db().session.deleteMany();
+    await db().apiKey.deleteMany();
+    await db().user.deleteMany();
+    auth.refreshAuthState();
+}
+
+/** Define API_TOKEN durante o bloco de testes (a autenticação lê a config real). */
+export function useApiToken(hooks, token) {
+    let previous;
+    hooks.beforeAll(() => {
+        previous = config.apiToken;
+        config.apiToken = token;
+    });
+    hooks.afterAll(() => {
+        config.apiToken = previous;
+    });
 }
 
 let nextId = 1;

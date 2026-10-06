@@ -52,6 +52,13 @@ function buildOpenApi(routes, { version, basePath }) {
             };
         }
         if (route.params) operation.responses[404] = errorResponse('Não encontrado');
+        if (route.public) {
+            operation.security = [];
+            delete operation.responses[401];
+        } else if (route.roles && route.roles.length < 3) {
+            operation.description = ((operation.description || '') + ' Papéis: ' + route.roles.join(', ') + '.').trim();
+            operation.responses[403] = errorResponse('Sem permissão');
+        }
         paths[path] = { ...(paths[path] || {}), [route.method]: operation };
     }
     return {
@@ -65,9 +72,12 @@ function buildOpenApi(routes, { version, basePath }) {
                 'disponíveis com o formato `{ result, message }`.'
         },
         servers: [{ url: '/' }],
-        security: [{ bearer: [] }],
+        security: [{ bearer: [] }, { cookie: [] }],
         components: {
-            securitySchemes: { bearer: { type: 'http', scheme: 'bearer', description: 'API_TOKEN' } },
+            securitySchemes: {
+                bearer: { type: 'http', scheme: 'bearer', description: 'Chave de API (mzk_...) ou API_TOKEN' },
+                cookie: { type: 'apiKey', in: 'cookie', name: 'myzap_session', description: 'Login do painel' }
+            },
             schemas: {
                 Error: {
                     type: 'object',

@@ -1,9 +1,19 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import request from 'supertest';
-import { resetAll, connect, fakeClient, incoming, createApp, Sessions, history, db, disconnect } from './helpers.js';
+import {
+    resetAll,
+    connect,
+    fakeClient,
+    incoming,
+    createApp,
+    Sessions,
+    history,
+    db,
+    disconnect,
+    useApiToken
+} from './helpers.js';
 
-const config = { apiToken: 'segredo', corsOrigins: [], rateLimit: 0, trustProxy: false };
-const app = createApp({ config, sessions: Sessions });
+const app = createApp({ sessions: Sessions });
 const api = {
     get: url =>
         request(app)
@@ -22,6 +32,7 @@ const api = {
 };
 const launch = vi.spyOn(Sessions, 'launch').mockImplementation(() => undefined);
 
+useApiToken({ beforeAll, afterAll }, 'segredo');
 afterAll(() => disconnect());
 beforeEach(async () => {
     await resetAll();

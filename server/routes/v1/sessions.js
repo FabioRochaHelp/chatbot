@@ -4,8 +4,11 @@ const { db } = require('../../db');
 const messaging = require('../../messaging');
 const { AppError } = require('../../errors');
 const schemas = require('./schemas');
+const { ROLES } = require('./router');
 
 const tags = ['Sessões'];
+// atendentes só consultam; criar, conectar, fechar e enviar avulso é de admin/integração
+const manage = ROLES.manage;
 
 function view(row, memory) {
     return {
@@ -47,6 +50,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
     define(
         {
             method: 'post',
+            roles: manage,
             path: '/sessions',
             status: 201,
             tags,
@@ -72,6 +76,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
     define(
         {
             method: 'patch',
+            roles: manage,
             path: '/sessions/:name',
             tags,
             summary: 'Altera opções da sessão',
@@ -89,6 +94,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
     define(
         {
             method: 'post',
+            roles: manage,
             path: '/sessions/:name/start',
             tags,
             summary: 'Inicia (ou reconecta) a sessão',
@@ -103,6 +109,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
     define(
         {
             method: 'post',
+            roles: manage,
             path: '/sessions/:name/close',
             tags,
             summary: 'Fecha a sessão',
@@ -120,6 +127,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
     define(
         {
             method: 'get',
+            roles: manage,
             path: '/sessions/:name/qrcode',
             tags,
             summary: 'QR code para conectar',
@@ -144,6 +152,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
     define(
         {
             method: 'post',
+            roles: manage,
             path: '/sessions/:name/messages',
             status: 201,
             tags: ['Mensagens'],

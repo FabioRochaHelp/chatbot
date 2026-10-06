@@ -2,6 +2,7 @@
 
 const express = require('express');
 const http = require('./http');
+const auth = require('./auth');
 const swaggerUi = require('swagger-ui-express');
 const legacyRoutes = require('./routes/legacy');
 const v1Routes = require('./routes/v1');
@@ -10,10 +11,10 @@ const { version } = require('../package.json');
 
 /**
  * Monta a app Express sem abrir porta (o listen fica no index.js).
- * deps.sessions / deps.config permitem injetar dublês nos testes.
+ * deps.sessions permite injetar um dublê nos testes.
  */
 function createApp(deps = {}) {
-    const config = deps.config || require('./config');
+    const config = require('./config');
     const Sessions = deps.sessions || require('./sessions');
 
     const app = express();
@@ -30,9 +31,9 @@ function createApp(deps = {}) {
     app.get('/api/openapi.json', (req, res) => res.json(openapi));
     app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: 'MyZap API' }));
 
-    app.use(http.auth(config.apiToken));
+    app.use(auth.authenticate);
     app.use('/api/v1', v1.router);
-    app.use(legacyRoutes(Sessions));
+    app.use(auth.requireLegacyAccess(http.errorBody), legacyRoutes(Sessions));
 
     app.use(http.notFound);
     app.use(http.errorHandler);
