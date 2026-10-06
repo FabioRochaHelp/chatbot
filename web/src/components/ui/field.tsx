@@ -16,7 +16,7 @@ export function Field({ label, hint, error, className, children }: FieldProps) {
     const id = useId();
     const describedBy = error || hint ? id + '-help' : undefined;
     return (
-        <div className={cn('grid gap-1.5', className)}>
+        <div className={cn('grid content-start gap-1.5', className)}>
             <Label.Root htmlFor={id} className="text-sm font-medium">
                 {label}
             </Label.Root>

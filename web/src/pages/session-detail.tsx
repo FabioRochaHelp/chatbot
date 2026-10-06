@@ -15,6 +15,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/queries';
 import { useRealtime } from '@/lib/realtime-context';
+import { useAiAgents } from '@/lib/ai-queries';
 import type { FlowSummary } from '@/lib/flow-types';
 import type { Session } from '@/lib/types';
 
@@ -145,24 +146,39 @@ function Connection({ session }: { session: Session }) {
 function BotSettings({ session }: { session: Session }) {
     const queryClient = useQueryClient();
     const { data: flows } = useQuery({ queryKey: ['flows'], queryFn: () => api.get<FlowSummary[]>('/flows') });
+    const { data: agents } = useAiAgents();
     const save = useMutation({
-        mutationFn: (value: string) =>
-            api.patch<Session>(
-                path(session.name),
-                value === 'off' ? { botMode: 'off' } : { botMode: 'flow', flowId: Number(value) }
-            ),
+        mutationFn: (value: string) => {
+            const [mode, id] = value.split(':');
+            if (mode === 'flow') return api.patch<Session>(path(session.name), { botMode: 'flow', flowId: Number(id) });
+            if (mode === 'ai') return api.patch<Session>(path(session.name), { botMode: 'ai', aiAgentId: Number(id) });
+            return api.patch<Session>(path(session.name), { botMode: 'off' });
+        },
         onSuccess: updated => {
             queryClient.setQueryData(['sessions', session.name], updated);
             queryClient.invalidateQueries({ queryKey: ['sessions'], exact: true });
             toast.success(
                 updated.botMode === 'off'
                     ? 'Bot desligado: novas conversas vão direto para a fila'
-                    : `Bot ligado com o fluxo “${updated.flow?.name}”`
+                    : updated.botMode === 'ai'
+                      ? `IA ligada: “${updated.aiAgent?.name}” responde as novas conversas`
+                      : `Bot ligado com o fluxo “${updated.flow?.name}”`
             );
         },
         onError: error => toast.error(error instanceof ApiError ? error.message : 'Não foi possível alterar.')
     });
-    const value = session.botMode.includes('flow') && session.flow ? String(session.flow.id) : 'off';
+    const value =
+        session.botMode === 'flow' && session.flow
+            ? 'flow:' + session.flow.id
+            : session.botMode === 'ai' && session.aiAgent
+              ? 'ai:' + session.aiAgent.id
+              : 'off';
+    const editLink =
+        session.botMode === 'flow' && session.flow
+            ? { to: '/flows/' + session.flow.id, label: `Editar o fluxo “${session.flow.name}”` }
+            : session.botMode === 'ai' && session.aiAgent
+              ? { to: '/ai/' + session.aiAgent.id, label: `Editar o assistente “${session.aiAgent.name}”` }
+              : null;
 
     return (
         <div className="grid gap-2 border-t pt-4">
@@ -176,25 +192,45 @@ function BotSettings({ session }: { session: Session }) {
                 onChange={event => save.mutate(event.target.value)}
             >
                 <option value="off">Desligado (tudo vai para a fila)</option>
-                {flows?.map(flow => (
-                    <option key={flow.id} value={flow.id} disabled={flow.version === 0}>
-                        Fluxo: {flow.name}
-                        {flow.version === 0 ? ' (publique antes)' : ''}
-                    </option>
-                ))}
+                {flows && flows.length > 0 && (
+                    <optgroup label="Fluxos">
+                        {flows.map(flow => (
+                            <option key={flow.id} value={'flow:' + flow.id} disabled={flow.version === 0}>
+                                {flow.name}
+                                {flow.version === 0 ? ' (publique antes)' : ''}
+                            </option>
+                        ))}
+                    </optgroup>
+                )}
+                {agents && agents.length > 0 && (
+                    <optgroup label="Assistentes de IA">
+                        {agents.map(agent => (
+                            <option key={agent.id} value={'ai:' + agent.id}>
+                                {agent.name}
+                            </option>
+                        ))}
+                    </optgroup>
+                )}
             </Select>
-            {value !== 'off' && session.flow && (
-                <Link
-                    to={'/flows/' + session.flow.id}
-                    className="text-[13px] text-primary underline-offset-4 hover:underline"
-                >
-                    Editar o fluxo “{session.flow.name}”
+            {editLink ? (
+                <Link to={editLink.to} className="text-[13px] text-primary underline-offset-4 hover:underline">
+                    {editLink.label}
                 </Link>
-            )}
-            {flows && flows.length === 0 && (
-                <Link to="/flows" className="text-[13px] text-primary underline-offset-4 hover:underline">
-                    Criar um fluxo
-                </Link>
+            ) : (
+                flows?.length === 0 &&
+                agents?.length === 0 && (
+                    <p className="text-[13px] text-muted-foreground">
+                        Crie um{' '}
+                        <Link to="/flows" className="text-primary underline-offset-4 hover:underline">
+                            fluxo
+                        </Link>{' '}
+                        ou um{' '}
+                        <Link to="/ai" className="text-primary underline-offset-4 hover:underline">
+                            assistente de IA
+                        </Link>
+                        .
+                    </p>
+                )
             )}
         </div>
     );

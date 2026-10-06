@@ -24,6 +24,7 @@ const NODE_TYPES = [
     'http',
     'tag',
     'handoff',
+    'ai',
     'end'
 ];
 
@@ -316,6 +317,12 @@ async function run(definition, state, input, context = {}, io = {}) {
                 effects.push({ type: 'handoff', reason: 'flow' });
                 return finish();
 
+            case 'ai':
+                // daqui em diante o assistente de IA responde (o pipeline troca o estado da conversa)
+                if (data.text) replies.push(render(data.text, vars));
+                effects.push({ type: 'ai', agentId: data.agentId || null });
+                return finish();
+
             case 'end':
                 if (data.text) replies.push(render(data.text, vars));
                 effects.push({ type: 'end', close: Boolean(data.close) });
@@ -371,6 +378,7 @@ function validate(definition) {
         if (node.type === 'businessHours' && !(data.schedule || []).length) err('Horário de atendimento sem horários.');
         if (node.type === 'http' && !/^https?:\/\//i.test(data.url || '')) err('Requisição sem URL http(s).');
         if (node.type === 'tag' && !String(data.tag || '').trim()) err('Etiqueta sem nome.');
+        if (node.type === 'ai' && !data.agentId) err('Escolha o assistente de IA.');
         if (node.type === 'question' || node.type === 'http') {
             if (data.saveAs !== undefined && data.saveAs !== '' && !VARIABLE.test(data.saveAs))
                 err('Nome de variável inválido.');

@@ -10,7 +10,10 @@ const { botActive } = require('../../bot-mode');
 const { Prisma } = require('@prisma/client');
 
 const tags = ['Sessões'];
-const WITH_FLOW = { flow: { select: { id: true, name: true, version: true, published: true } } };
+const WITH_FLOW = {
+    flow: { select: { id: true, name: true, version: true, published: true } },
+    aiAgent: { select: { id: true, name: true, model: true } }
+};
 // atendentes só consultam; criar, conectar, fechar e enviar avulso é de admin/integração
 const manage = ROLES.manage;
 
@@ -22,6 +25,7 @@ function view(row, memory) {
         autoStart: row ? row.autoStart : null,
         botMode: row ? row.botMode : 'off',
         flow: row && row.flow ? { id: row.flow.id, name: row.flow.name, version: row.flow.version } : null,
+        aiAgent: row && row.aiAgent ? row.aiAgent : null,
         hasQrcode: Boolean(memory && memory.state === 'QRCODE' && memory.qrcode),
         createdAt: row ? row.createdAt : null,
         updatedAt: row ? row.updatedAt : null
@@ -67,7 +71,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
             await Sessions.start(body.name);
             await db().session.update({
                 where: { name: body.name },
-                data: { autoStart: body.autoStart, botMode: body.botMode }
+                data: { autoStart: body.autoStart }
             });
             return current(body.name);
         }
@@ -95,10 +99,18 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
                 const flow = await db().flow.findUnique({ where: { id: body.flowId } });
                 if (!flow) throw new AppError(400, 'FLOW_NOT_FOUND', 'fluxo não encontrado');
             }
+            if (body.aiAgentId) {
+                const agent = await db().aiAgent.findUnique({ where: { id: body.aiAgentId } });
+                if (!agent) throw new AppError(400, 'AI_AGENT_NOT_FOUND', 'assistente de IA não encontrado');
+            }
             const botMode = body.botMode ?? row.botMode;
             const flowId = body.flowId !== undefined ? body.flowId : row.flowId;
-            if (botMode.includes('flow') && !flowId) {
+            const aiAgentId = body.aiAgentId !== undefined ? body.aiAgentId : row.aiAgentId;
+            if (botMode === 'flow' && !flowId) {
                 throw new AppError(400, 'FLOW_REQUIRED', 'escolha um fluxo para ligar o bot de fluxo');
+            }
+            if (botMode === 'ai' && !aiAgentId) {
+                throw new AppError(400, 'AI_AGENT_REQUIRED', 'escolha um assistente de IA para ligar a IA');
             }
             const updated = await db().session.update({ where: { name: params.name }, data: body, include: WITH_FLOW });
             if (!botActive(updated)) {

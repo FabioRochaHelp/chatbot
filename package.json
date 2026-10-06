@@ -25,6 +25,7 @@
     "author": "Bill Barsch",
     "license": "ISC",
     "dependencies": {
+        "@anthropic-ai/sdk": "0.131.0",
         "@prisma/adapter-better-sqlite3": "7.10.0",
         "@prisma/client": "7.10.0",
         "@wppconnect-team/wppconnect": "2.3.4",

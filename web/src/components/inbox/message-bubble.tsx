@@ -6,7 +6,7 @@ import { RichText } from './rich-text';
 
 const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-const ORIGIN_LABEL: Record<string, string> = { bot: 'Bot', api: 'API', phone: 'Celular' };
+const ORIGIN_LABEL: Record<string, string> = { bot: 'Bot', ai: 'IA', api: 'API', phone: 'Celular' };
 
 const mediaUrl = (message: Message) => `/api/v1/messages/${message.id}/media`;
 

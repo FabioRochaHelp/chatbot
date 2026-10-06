@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
+import { useAiAgents } from '@/lib/ai-queries';
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -112,6 +114,39 @@ function ListRow({
                 </Button>
             )}
         </div>
+    );
+}
+
+function AiNodeFields({ data, set }: { data: FlowNodeData; set: (patch: Partial<FlowNodeData>) => void }) {
+    const { data: agents } = useAiAgents();
+    return (
+        <>
+            <Field label="Assistente" hint="A IA responde a mensagem atual e as próximas, até transferir ou encerrar.">
+                <Select
+                    value={data.agentId ?? ''}
+                    onChange={event => {
+                        const agent = agents?.find(item => item.id === Number(event.target.value));
+                        set({ agentId: agent?.id, agentName: agent?.name });
+                    }}
+                >
+                    <option value="">Escolha…</option>
+                    {agents?.map(agent => (
+                        <option key={agent.id} value={agent.id}>
+                            {agent.name}
+                        </option>
+                    ))}
+                </Select>
+            </Field>
+            {agents?.length === 0 && (
+                <Link to="/ai" className="text-[13px] text-primary underline-offset-4 hover:underline">
+                    Criar um assistente de IA
+                </Link>
+            )}
+            <Field label="Mensagem antes de passar para a IA (opcional)" hint={VARIABLE_HINT}>
+                <Textarea value={data.text ?? ''} onChange={event => set({ text: event.target.value })} rows={2} />
+            </Field>
+            <p className="text-[13px] text-muted-foreground">Bom para depois de um menu, na opção “Outros assuntos”.</p>
+        </>
     );
 }
 
@@ -531,6 +566,9 @@ function Body({
                     />
                 </Field>
             );
+
+        case 'ai':
+            return <AiNodeFields data={data} set={set} />;
 
         case 'end':
             return (

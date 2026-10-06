@@ -22,6 +22,8 @@ function list(value) {
 module.exports = {
     env: process.env.NODE_ENV || 'development',
     logLevel: process.env.LOG_LEVEL || 'info',
+    // fuso usado no contexto da IA (data/hora atual)
+    timezone: process.env.TIMEZONE || 'America/Sao_Paulo',
     // vazio = libera qualquer origem (comportamento antigo)
     corsOrigins: list(process.env.CORS_ORIGINS),
     // requisições por minuto por IP; 0 desativa

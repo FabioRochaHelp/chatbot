@@ -18,6 +18,8 @@ export async function resetAll() {
     history._sessionIds.clear();
     await db().session.deleteMany();
     await db().flow.deleteMany();
+    await db().aiUsage.deleteMany();
+    await db().aiAgent.deleteMany();
     await db().apiKey.deleteMany();
     await db().user.deleteMany();
     auth.refreshAuthState();

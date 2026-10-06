@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router';
 import {
     BookOpen,
     Workflow,
+    Sparkles,
     LayoutDashboard,
     LogOut,
     Menu,
@@ -37,6 +38,7 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
         ...(canManage
             ? [
                   { to: '/flows', label: 'Fluxos', icon: Workflow },
+                  { to: '/ai', label: 'Assistentes de IA', icon: Sparkles },
                   { to: '/send', label: 'Enviar mensagem', icon: Send }
               ]
             : []),

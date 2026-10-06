@@ -23,6 +23,7 @@ export type Session = {
     autoStart: boolean | null;
     botMode: string;
     flow: { id: number; name: string; version: number } | null;
+    aiAgent: { id: number; name: string; model: string } | null;
     hasQrcode: boolean;
     createdAt: string | null;
     updatedAt: string | null;

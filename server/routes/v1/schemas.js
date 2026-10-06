@@ -22,7 +22,7 @@ const content = z.discriminatedUnion('type', [
 ]);
 
 const statuses = ['bot', 'pending', 'open', 'closed'];
-const botModes = ['off', 'flow', 'ai', 'flow+ai'];
+const botModes = ['off', 'flow', 'ai'];
 
 module.exports = {
     content,
@@ -30,15 +30,19 @@ module.exports = {
     sessionParams: z.object({ name: sessionName }),
     idParams: z.object({ id: z.coerce.number().int().positive() }),
     numberParams: z.object({ name: sessionName, number: chatId }),
-    createSession: z.object({
-        name: sessionName,
-        autoStart: z.boolean().default(true),
-        botMode: z.enum(botModes).default('off')
-    }),
+    // o bot é ligado depois, no PATCH (que exige o fluxo/assistente)
+    createSession: z.object({ name: sessionName, autoStart: z.boolean().default(true) }),
     updateSession: z.object({
         autoStart: z.boolean().optional(),
         botMode: z.enum(botModes).optional(),
-        flowId: z.number().int().positive().nullable().optional().describe('fluxo usado quando botMode inclui flow')
+        flowId: z.number().int().positive().nullable().optional().describe('fluxo usado quando botMode = flow'),
+        aiAgentId: z
+            .number()
+            .int()
+            .positive()
+            .nullable()
+            .optional()
+            .describe('assistente de IA usado quando botMode = ai')
     }),
     qrcodeQuery: z.object({ format: z.enum(['json', 'png']).default('json') }),
     status: z.enum(statuses),

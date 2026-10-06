@@ -8,6 +8,7 @@ import {
     MessageCircleQuestion,
     MessageSquareText,
     Play,
+    Sparkles,
     Tag,
     Timer,
     type LucideIcon
@@ -24,6 +25,7 @@ export type FlowNodeType =
     | 'http'
     | 'tag'
     | 'handoff'
+    | 'ai'
     | 'end';
 
 export type MenuOption = { id: string; label: string };
@@ -52,6 +54,8 @@ export type FlowNodeData = {
     saveAs?: string;
     tag?: string;
     close?: boolean;
+    agentId?: number;
+    agentName?: string;
 };
 
 export type FlowSettings = { timeoutMinutes?: number; handoffKeywords?: string[]; handoffText?: string };
@@ -195,6 +199,14 @@ export const NODE_META: Record<FlowNodeType, Meta> = {
         create: () => ({ text: 'Vou te passar para um atendente.' }),
         outputs: () => []
     },
+    ai: {
+        label: 'IA',
+        description: 'Um assistente de IA continua a conversa a partir daqui.',
+        icon: Sparkles,
+        tone: 'text-primary',
+        create: () => ({}),
+        outputs: () => []
+    },
     end: {
         label: 'Fim',
         description: 'Termina o fluxo (opcionalmente encerra a conversa).',
@@ -214,6 +226,7 @@ export const PALETTE: FlowNodeType[] = [
     'delay',
     'http',
     'tag',
+    'ai',
     'handoff',
     'end'
 ];
@@ -244,6 +257,8 @@ export function nodeSummary(type: FlowNodeType, data: FlowNodeData): string {
             return `${data.method ?? 'GET'} ${data.url ?? ''}`;
         case 'tag':
             return data.tag ? `#${data.tag}` : '';
+        case 'ai':
+            return data.agentName ? `Assistente: ${data.agentName}` : '';
         case 'end':
             return (
                 [data.text, data.close ? 'Encerra a conversa' : ''].filter(Boolean).join(' · ') ||

@@ -16,6 +16,8 @@ const InboxPage = lazy(() => import('@/pages/inbox').then(m => ({ default: m.Inb
 const SettingsPage = lazy(() => import('@/pages/settings').then(m => ({ default: m.SettingsPage })));
 const FlowsPage = lazy(() => import('@/pages/flows').then(m => ({ default: m.FlowsPage })));
 const FlowEditorPage = lazy(() => import('@/pages/flow-editor').then(m => ({ default: m.FlowEditorPage })));
+const AiAgentsPage = lazy(() => import('@/pages/ai-agents').then(m => ({ default: m.AiAgentsPage })));
+const AiAgentPage = lazy(() => import('@/pages/ai-agent').then(m => ({ default: m.AiAgentPage })));
 const NotFoundPage = lazy(() => import('@/pages/not-found').then(m => ({ default: m.NotFoundPage })));
 
 function Splash() {
@@ -68,6 +70,22 @@ export function App() {
                     element={
                         <ManagersOnly>
                             <FlowsPage />
+                        </ManagersOnly>
+                    }
+                />
+                <Route
+                    path="ai"
+                    element={
+                        <ManagersOnly>
+                            <AiAgentsPage />
+                        </ManagersOnly>
+                    }
+                />
+                <Route
+                    path="ai/:id"
+                    element={
+                        <ManagersOnly>
+                            <AiAgentPage />
                         </ManagersOnly>
                     }
                 />

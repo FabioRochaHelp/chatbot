@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Flag, Headset, RotateCcw, SendHorizontal, Tag, X } from 'lucide-react';
+import { Flag, Headset, RotateCcw, SendHorizontal, Sparkles, Tag, X } from 'lucide-react';
 import { RichText } from '@/components/inbox/rich-text';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import type { FlowDefinition } from '@/lib/flow-types';
 import { cn } from '@/lib/utils';
 
-type Effect = { type: 'handoff' | 'tag' | 'end'; tag?: string; close?: boolean; reason?: string };
+type Effect = { type: 'handoff' | 'tag' | 'end' | 'ai'; tag?: string; close?: boolean; reason?: string };
 type Result = { replies: string[]; effects: Effect[]; state: { nodeId: string } | null; trace: string[] };
 type Entry = { from: 'user' | 'bot'; text: string } | { from: 'system'; effect: Effect };
 
@@ -21,11 +21,16 @@ const REASON: Record<string, string> = {
 
 function EffectChip({ effect }: { effect: Effect }) {
     const [Icon, text] =
-        effect.type === 'handoff'
-            ? [Headset, `Transferido para a fila${effect.reason ? ` (${REASON[effect.reason] ?? effect.reason})` : ''}`]
-            : effect.type === 'tag'
-              ? [Tag, `Etiqueta adicionada: ${effect.tag}`]
-              : [Flag, effect.close ? 'Fim do fluxo · conversa encerrada' : 'Fim do fluxo'];
+        effect.type === 'ai'
+            ? [Sparkles, 'Daqui em diante a IA responde (teste em Assistentes de IA)']
+            : effect.type === 'handoff'
+              ? [
+                    Headset,
+                    `Transferido para a fila${effect.reason ? ` (${REASON[effect.reason] ?? effect.reason})` : ''}`
+                ]
+              : effect.type === 'tag'
+                ? [Tag, `Etiqueta adicionada: ${effect.tag}`]
+                : [Flag, effect.close ? 'Fim do fluxo · conversa encerrada' : 'Fim do fluxo'];
     return (
         <div className="my-1 flex justify-center">
             <span className="flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs text-muted-foreground shadow-xs">

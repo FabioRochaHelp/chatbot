@@ -17,6 +17,9 @@ model Session {
   // fluxo usado quando botMode inclui "flow"
   flowId        Int?
   flow          Flow?          @relation(fields: [flowId], references: [id], onDelete: SetNull)
+  // assistente usado quando botMode = "ai"
+  aiAgentId     Int?
+  aiAgent       AiAgent?       @relation(fields: [aiAgentId], references: [id], onDelete: SetNull)
   lastState     String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -171,4 +174,44 @@ model Flow {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   sessions    Session[]
+}
+
+model AiAgent {
+  id                Int       @id @default(autoincrement())
+  name              String
+  model             String    @default("claude-opus-5")
+  // low | medium | high (profundidade do raciocínio; chat costuma ir bem em low)
+  effort            String    @default("low")
+  // como o assistente deve se comportar (tom, o que pode ou não fazer)
+  instructions      String    @default("")
+  // fatos da empresa: horários, preços, políticas, perguntas frequentes
+  knowledge         String    @default("")
+  // mensagens anteriores da conversa enviadas como contexto
+  historyMessages   Int       @default(20)
+  // respostas por conversa por hora; acima disso transfere para atendente
+  maxRepliesPerHour Int       @default(20)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  sessions          Session[]
+  usage             AiUsage[]
+}
+
+model AiUsage {
+  id               Int      @id @default(autoincrement())
+  agentId          Int?
+  agent            AiAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  conversationId   Int?
+  model            String
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  // reply | handoff | end | error | refusal | limit
+  outcome          String
+  // teste no painel (playground) não entra nos limites
+  test             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([conversationId, createdAt])
 }

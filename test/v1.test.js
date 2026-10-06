@@ -75,16 +75,17 @@ describe('API v1: geral', () => {
 
 describe('API v1: sessões', () => {
     it('cria, lista, altera e fecha', async () => {
-        const created = await api.post('/sessions', { name: 'loja', botMode: 'flow' });
+        const created = await api.post('/sessions', { name: 'loja' });
         expect(created.status).toBe(201);
-        expect(created.body.data).toMatchObject({ name: 'loja', state: 'STARTING', autoStart: true, botMode: 'flow' });
+        expect(created.body.data).toMatchObject({ name: 'loja', state: 'STARTING', autoStart: true, botMode: 'off' });
         expect(launch).toHaveBeenCalledTimes(1);
 
         const list = await api.get('/sessions');
         expect(list.body.data.map(session => session.name)).toEqual(['loja']);
 
-        const patched = await api.patch('/sessions/loja', { botMode: 'ai' });
-        expect(patched.body.data.botMode).toBe('ai');
+        const patched = await api.patch('/sessions/loja', { autoStart: false });
+        expect(patched.body.data.autoStart).toBe(false);
+        expect((await api.patch('/sessions/loja', { botMode: 'ai' })).body.error.code).toBe('AI_AGENT_REQUIRED');
 
         const closed = await api.post('/sessions/loja/close');
         expect(closed.body.data).toMatchObject({ state: 'CLOSED', autoStart: false });

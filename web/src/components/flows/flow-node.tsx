@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { useEditor, type EditorNode } from './editor-context';
 
 // blocos que não fazem sentido sem conteúdo (os demais têm resumo próprio ou nenhum)
-const NEEDS_CONTENT = new Set(['message', 'menu', 'question', 'http', 'tag']);
+const NEEDS_CONTENT = new Set(['message', 'menu', 'question', 'http', 'tag', 'ai']);
 
 const handleClass = '!size-3 !border-2 !border-card !bg-muted-foreground hover:!bg-primary';
 
