@@ -13,7 +13,7 @@ export function AiUnavailable() {
                 <p className="mt-1 text-muted-foreground">
                     Crie uma chave em <span className="font-medium text-foreground">platform.claude.com</span>, coloque{' '}
                     <code className="rounded bg-card px-1">ANTHROPIC_API_KEY=...</code> no arquivo{' '}
-                    <code className="rounded bg-card px-1">.env</code> e reinicie o MyZap. Enquanto isso, conversas
+                    <code className="rounded bg-card px-1">.env</code> e reinicie o ConectZap. Enquanto isso, conversas
                     destinadas à IA vão direto para a fila de atendimento.
                 </p>
             </div>

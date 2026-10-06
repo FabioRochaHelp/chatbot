@@ -35,7 +35,7 @@ export function WebhooksPage() {
         <>
             <PageHeader
                 title="Webhooks"
-                description="Avise outros sistemas (CRM, ERP, planilhas, automações) quando algo acontecer no MyZap."
+                description="Avise outros sistemas (CRM, ERP, planilhas, automações) quando algo acontecer no ConectZap."
                 actions={
                     <Button onClick={() => setOpen(true)}>
                         <Plus /> Novo webhook
@@ -93,8 +93,8 @@ export function WebhooksPage() {
                         </span>
                         <h2 className="font-semibold">Nenhum webhook</h2>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            O MyZap envia um POST com JSON assinado para o seu sistema a cada evento escolhido e tenta
-                            de novo se ele estiver fora do ar.
+                            O ConectZap envia um POST com JSON assinado para o seu sistema a cada evento escolhido e
+                            tenta de novo se ele estiver fora do ar.
                         </p>
                         <Button className="mt-2" onClick={() => setOpen(true)}>
                             <Plus /> Criar webhook

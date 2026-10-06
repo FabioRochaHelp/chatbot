@@ -190,7 +190,7 @@ module.exports = function webhookRoutes({ define }) {
             const hook = await find(params.id);
             if (hook.legacy) throw new AppError(409, 'LEGACY_WEBHOOK', 'webhook antigo não recebe eventos de teste');
             const delivery = await db().webhookDelivery.create({
-                data: { webhookId: hook.id, event: 'ping', payload: { message: 'Teste do MyZap' } }
+                data: { webhookId: hook.id, event: 'ping', payload: { message: 'Teste do ConectZap' } }
             });
             webhooks.worker.kick();
             return delivery;

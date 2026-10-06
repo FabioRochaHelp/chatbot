@@ -30,7 +30,12 @@ function fakeFetch(...statuses) {
 
 async function hook(data = {}) {
     return db().webhook.create({
-        data: { url: 'https://hooks.exemplo.com/myzap', secret: 'whsec_teste', events: ['message.received'], ...data }
+        data: {
+            url: 'https://hooks.exemplo.com/conectzap',
+            secret: 'whsec_teste',
+            events: ['message.received'],
+            ...data
+        }
     });
 }
 
@@ -51,14 +56,14 @@ describe('entrega', () => {
 
         const [url, init] = fetch.mock.calls[0];
         expect(url).toBe(target.url);
-        expect(init.headers['X-MyZap-Event']).toBe('message.received');
+        expect(init.headers['X-ConectZap-Event']).toBe('message.received');
         const expected =
             'sha256=' +
             crypto
                 .createHmac('sha256', 'whsec_teste')
-                .update(`${init.headers['X-MyZap-Timestamp']}.${init.body}`)
+                .update(`${init.headers['X-ConectZap-Timestamp']}.${init.body}`)
                 .digest('hex');
-        expect(init.headers['X-MyZap-Signature']).toBe(expected);
+        expect(init.headers['X-ConectZap-Signature']).toBe(expected);
         const body = JSON.parse(init.body);
         expect(body).toMatchObject({ event: 'message.received', data: { hello: 'mundo', session: null } });
 
@@ -235,9 +240,9 @@ describe('API de webhooks e métricas', () => {
         const res = await admin.get('/metrics');
         expect(res.status).toBe(200);
         expect(res.headers['content-type']).toMatch(/text\/plain/);
-        expect(res.text).toContain('myzap_sessions');
-        expect(res.text).toContain('myzap_conversations{status="pending"');
-        expect(res.text).toContain('myzap_webhook_queue');
-        expect(res.text).toContain('myzap_http_request_duration_seconds_bucket');
+        expect(res.text).toContain('conectzap_sessions');
+        expect(res.text).toContain('conectzap_conversations{status="pending"');
+        expect(res.text).toContain('conectzap_webhook_queue');
+        expect(res.text).toContain('conectzap_http_request_duration_seconds_bucket');
     });
 });

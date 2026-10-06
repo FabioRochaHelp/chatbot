@@ -53,7 +53,7 @@ describe('modo aberto e setup', () => {
         expect(res.body.data).toMatchObject({ email: 'admin@exemplo.com', role: 'admin' });
         expect(res.body.data).not.toHaveProperty('passwordHash');
         const cookie = res.headers['set-cookie'][0];
-        expect(cookie).toMatch(/^myzap_session=/);
+        expect(cookie).toMatch(/^conectzap_session=/);
         expect(cookie).toMatch(/HttpOnly/);
         expect(cookie).toMatch(/SameSite=Strict/);
 
@@ -181,7 +181,7 @@ describe('chaves de API', () => {
         const created = await admin.post('/api/v1/api-keys').send({ name: 'ERP' });
         expect(created.status).toBe(201);
         const { key, id } = created.body.data;
-        expect(key).toMatch(/^mzk_/);
+        expect(key).toMatch(/^czk_/);
         expect(created.body.data).not.toHaveProperty('keyHash');
 
         const list = await admin.get('/api/v1/api-keys');
@@ -205,6 +205,23 @@ describe('chaves de API', () => {
         expect((await bearer('/api/v1/sessions')).status).toBe(401);
         // ?token= não aceita chave de API (só o API_TOKEN legado)
         expect((await request(app).get('/status?sessionName=s1&token=' + key)).status).toBe(401);
+    });
+
+    it('chave antiga (mzk_, de quando o app se chamava MyZap) continua valendo', async () => {
+        await setupAdmin();
+        const crypto = await import('crypto');
+        const legacy = 'mzk_' + 'a'.repeat(43);
+        await db().apiKey.create({
+            data: {
+                name: 'antiga',
+                prefix: legacy.slice(0, 10),
+                keyHash: crypto.createHash('sha256').update(legacy).digest('hex')
+            }
+        });
+        const res = await request(app)
+            .get('/api/v1/auth/me')
+            .set('Authorization', 'Bearer ' + legacy);
+        expect(res.body.data).toMatchObject({ type: 'apikey', role: 'integration' });
     });
 
     it('chave só por existir já fecha a API aberta', async () => {

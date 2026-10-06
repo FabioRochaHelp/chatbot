@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type Theme = 'light' | 'dark' | 'system';
-const KEY = 'myzap-theme';
+const KEY = 'conectzap-theme';
+// nome antigo do app (MyZap): lido se ainda não houver a chave nova
+const OLD_KEY = 'myzap-theme';
 
 function stored(): Theme {
     try {
-        const value = localStorage.getItem(KEY);
+        const value = localStorage.getItem(KEY) ?? localStorage.getItem(OLD_KEY);
         return value === 'light' || value === 'dark' ? value : 'system';
     } catch {
         return 'system';

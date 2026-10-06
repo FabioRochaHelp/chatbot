@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
@@ -11,6 +12,13 @@ if (!ENGINES.includes(engine)) {
 }
 
 const dataDir = path.resolve(process.env.DATA_DIR || './data');
+
+/** conectzap.db; instalações de quando o app se chamava MyZap seguem usando o myzap.db existente. */
+function defaultDatabase() {
+    const legacy = path.join(dataDir, 'myzap.db');
+    const current = path.join(dataDir, 'conectzap.db');
+    return !fs.existsSync(current) && fs.existsSync(legacy) ? legacy : current;
+}
 
 function list(value) {
     return (value || '')
@@ -35,7 +43,7 @@ module.exports = {
     engine: engine,
     tokensDir: path.resolve(process.env.TOKENS_DIR || './tokens'),
     dataDir: dataDir,
-    databaseUrl: process.env.DATABASE_URL || 'file:' + path.join(dataDir, 'myzap.db'),
+    databaseUrl: process.env.DATABASE_URL || 'file:' + defaultDatabase(),
     dbMigrate: process.env.DB_MIGRATE !== '0',
     mediaDir: path.join(dataDir, 'media'),
     mediaMaxBytes: (parseInt(process.env.MEDIA_MAX_MB, 10) || 50) * 1024 * 1024,

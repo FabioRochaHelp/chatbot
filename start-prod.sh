@@ -1,2 +1,2 @@
 #!/bin/bash
-docker compose up -d --build myzap
+docker compose up -d --build conectzap

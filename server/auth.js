@@ -10,8 +10,10 @@ const log = require('./logger');
 
 const scrypt = promisify(crypto.scrypt);
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
-const COOKIE = 'myzap_session';
-const API_KEY_PREFIX = 'mzk_';
+const COOKIE = 'conectzap_session';
+const API_KEY_PREFIX = 'czk_';
+// chaves criadas quando o app se chamava MyZap continuam valendo
+const LEGACY_API_KEY_PREFIXES = ['mzk_'];
 
 // ---------- senha (scrypt nativo: sem módulo nativo para compilar) ----------
 
@@ -127,7 +129,7 @@ function generateApiKey() {
 }
 
 async function apiKeyFromToken(token) {
-    if (!token.startsWith(API_KEY_PREFIX)) return null;
+    if (![API_KEY_PREFIX, ...LEGACY_API_KEY_PREFIXES].some(prefix => token.startsWith(prefix))) return null;
     const apiKey = await db().apiKey.findUnique({ where: { keyHash: sha256(token) } });
     if (!apiKey || apiKey.revokedAt) return null;
     // atualiza no máximo uma vez por minuto

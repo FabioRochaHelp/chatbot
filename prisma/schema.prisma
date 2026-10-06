@@ -35,7 +35,7 @@ model Webhook {
   sessionId  Int?
   session    Session?          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   url        String
-  // segredo da assinatura HMAC (X-MyZap-Signature); webhooks antigos não assinam
+  // segredo da assinatura HMAC (X-ConectZap-Signature); webhooks antigos não assinam
   secret     String?
   // eventos assinados, ex.: ["message.received", "conversation.handoff"]
   events     Json              @default("[\"message.received\"]")

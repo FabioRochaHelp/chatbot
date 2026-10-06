@@ -38,7 +38,7 @@ function RequireAuth() {
     if (status.isError || !status.data) {
         return (
             <div className="flex min-h-dvh items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                Não foi possível falar com o servidor. Verifique se o MyZap está rodando e recarregue a página.
+                Não foi possível falar com o servidor. Verifique se o ConectZap está rodando e recarregue a página.
             </div>
         );
     }

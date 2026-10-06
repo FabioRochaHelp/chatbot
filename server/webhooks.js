@@ -11,8 +11,8 @@ const { version } = require('../package.json');
  * com assinatura HMAC e tenta de novo com espera crescente. A fila fica no banco (sobrevive a restart).
  *
  * Corpo: { id, event, createdAt, data }.
- * Cabeçalhos: X-MyZap-Event, X-MyZap-Delivery, X-MyZap-Timestamp e
- * X-MyZap-Signature: sha256=<hex HMAC-SHA256(secret, `${timestamp}.${corpo}`)>.
+ * Cabeçalhos: X-ConectZap-Event, X-ConectZap-Delivery, X-ConectZap-Timestamp e
+ * X-ConectZap-Signature: sha256=<hex HMAC-SHA256(secret, `${timestamp}.${corpo}`)>.
  */
 
 const EVENTS = ['message.received', 'message.sent', 'conversation.updated', 'conversation.handoff', 'session.state'];
@@ -122,12 +122,12 @@ async function deliver(delivery, fetchImpl = globalThis.fetch) {
     });
     const headers = {
         'Content-Type': 'application/json',
-        'User-Agent': 'MyZap-Webhooks/' + version,
-        'X-MyZap-Event': delivery.event,
-        'X-MyZap-Delivery': String(delivery.id),
-        'X-MyZap-Timestamp': String(timestamp)
+        'User-Agent': 'ConectZap-Webhooks/' + version,
+        'X-ConectZap-Event': delivery.event,
+        'X-ConectZap-Delivery': String(delivery.id),
+        'X-ConectZap-Timestamp': String(timestamp)
     };
-    if (hook.secret) headers['X-MyZap-Signature'] = sign(hook.secret, timestamp, body);
+    if (hook.secret) headers['X-ConectZap-Signature'] = sign(hook.secret, timestamp, body);
 
     const started = Date.now();
     let status = null;

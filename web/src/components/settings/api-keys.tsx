@@ -61,7 +61,7 @@ function CreateKeyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
             ) : (
                 <DialogContent
                     title="Nova chave de API"
-                    description="Para integrar outro sistema (ERP, CRM, loja virtual) ao MyZap."
+                    description="Para integrar outro sistema (ERP, CRM, loja virtual) ao ConectZap."
                 >
                     <form
                         className="grid gap-4"

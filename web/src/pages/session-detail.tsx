@@ -287,7 +287,7 @@ function Settings({ session }: { session: Session }) {
                         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                             <DialogContent
                                 title={`Fechar a sessão “${session.name}”?`}
-                                description="O número para de enviar e receber mensagens pelo MyZap e não reconecta sozinho ao reiniciar. O login no celular é mantido: para voltar, basta iniciar a sessão de novo."
+                                description="O número para de enviar e receber mensagens pelo ConectZap e não reconecta sozinho ao reiniciar. O login no celular é mantido: para voltar, basta iniciar a sessão de novo."
                             >
                                 <div className="flex justify-end gap-2">
                                     <Button variant="outline" onClick={() => setConfirmOpen(false)}>

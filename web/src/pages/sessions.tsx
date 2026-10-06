@@ -147,7 +147,7 @@ export function SessionsPage() {
         <>
             <PageHeader
                 title="Sessões"
-                description="Cada sessão é um número de WhatsApp conectado ao MyZap."
+                description="Cada sessão é um número de WhatsApp conectado ao ConectZap."
                 actions={
                     canManage && (
                         <Button onClick={() => setDialogOpen(true)}>

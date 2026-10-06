@@ -64,10 +64,10 @@ function buildOpenApi(routes, { version, basePath }) {
     return {
         openapi: '3.1.0',
         info: {
-            title: 'MyZap API',
+            title: 'ConectZap API',
             version,
             description:
-                'API v1 do MyZap. Respostas de sucesso vêm em `{ data }` (listas paginadas em `{ data, meta }`); ' +
+                'API v1 do ConectZap. Respostas de sucesso vêm em `{ data }` (listas paginadas em `{ data, meta }`); ' +
                 'erros em `{ error: { code, message, details } }`. As rotas antigas (/sendText, /start...) continuam ' +
                 'disponíveis com o formato `{ result, message }`.'
         },
@@ -76,7 +76,7 @@ function buildOpenApi(routes, { version, basePath }) {
         components: {
             securitySchemes: {
                 bearer: { type: 'http', scheme: 'bearer', description: 'Chave de API (mzk_...) ou API_TOKEN' },
-                cookie: { type: 'apiKey', in: 'cookie', name: 'myzap_session', description: 'Login do painel' }
+                cookie: { type: 'apiKey', in: 'cookie', name: 'conectzap_session', description: 'Login do painel' }
             },
             schemas: {
                 Error: {

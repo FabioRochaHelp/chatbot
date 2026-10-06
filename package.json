@@ -1,5 +1,5 @@
 {
-    "name": "myzap",
+    "name": "conectzap",
     "version": "1.0.0",
     "description": "Plataforma open source de atendimento pelo WhatsApp: API, painel, bot de fluxos, IA e webhooks",
     "main": "index.js",

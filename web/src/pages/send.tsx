@@ -80,7 +80,7 @@ export function SendPage() {
 
     const curl = [
         `curl -X POST ${window.location.origin}/api/v1/sessions/${encodeURIComponent(selected || 'minha-sessao')}/messages \\`,
-        `  -H "Authorization: Bearer $MYZAP_API_KEY" \\`,
+        `  -H "Authorization: Bearer $CONECTZAP_API_KEY" \\`,
         `  -H "Content-Type: application/json" \\`,
         `  -d '${JSON.stringify(preview).replace(/'/g, "'\\''")}'`
     ].join('\n');
@@ -281,7 +281,8 @@ export function SendPage() {
                         <div>
                             <CardTitle>Chamada equivalente</CardTitle>
                             <CardDescription>
-                                Crie uma chave de API e use no lugar de <code className="text-xs">$MYZAP_API_KEY</code>.
+                                Crie uma chave de API e use no lugar de{' '}
+                                <code className="text-xs">$CONECTZAP_API_KEY</code>.
                             </CardDescription>
                         </div>
                         <CopyButton text={curl} />

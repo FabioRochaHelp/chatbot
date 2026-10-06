@@ -46,7 +46,7 @@ export function SetupPage() {
 
     return (
         <AuthLayout
-            title="Configurar o MyZap"
+            title="Configurar o ConectZap"
             description="Crie a conta de administrador. Depois você poderá convidar atendentes."
         >
             <form className="grid gap-4" onSubmit={submit} noValidate>

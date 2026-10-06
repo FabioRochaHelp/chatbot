@@ -46,4 +46,4 @@ jobs:
     needs: [check, web]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build --target prod -t myzap:ci .
+      - run: docker build --target prod -t conectzap:ci .

@@ -5,9 +5,9 @@ import path from 'path';
 import request from 'supertest';
 import { resetAll, createApp, Sessions, history, db, disconnect, incoming } from './helpers.js';
 
-const webDir = fs.mkdtempSync(path.join(os.tmpdir(), 'myzap-web-'));
+const webDir = fs.mkdtempSync(path.join(os.tmpdir(), 'conectzap-web-'));
 fs.mkdirSync(path.join(webDir, 'assets'));
-fs.writeFileSync(path.join(webDir, 'index.html'), '<!doctype html><title>MyZap</title>');
+fs.writeFileSync(path.join(webDir, 'index.html'), '<!doctype html><title>ConectZap</title>');
 fs.writeFileSync(path.join(webDir, 'assets', 'app-123.js'), 'console.log(1)');
 fs.writeFileSync(path.join(webDir, 'favicon.svg'), '<svg/>');
 
@@ -26,13 +26,13 @@ describe('painel (web/dist)', () => {
         expect((await request(app).get('/')).body).toEqual({ result: 'ok' });
         const page = await html('/');
         expect(page.headers['content-type']).toMatch(/html/);
-        expect(page.text).toContain('<title>MyZap</title>');
+        expect(page.text).toContain('<title>ConectZap</title>');
         expect((await request(app).get('/health')).body).toEqual({ result: 'ok' });
     });
 
     it('rotas do painel caem no index.html; rotas antigas não', async () => {
         for (const url of ['/login', '/sessions', '/sessions/loja', '/send']) {
-            expect((await html(url)).text).toContain('<title>MyZap</title>');
+            expect((await html(url)).text).toContain('<title>ConectZap</title>');
         }
         const legacy = await html('/status?sessionName=x');
         expect(legacy.headers['content-type']).toMatch(/json/);

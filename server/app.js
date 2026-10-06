@@ -39,7 +39,7 @@ function createApp(deps = {}) {
     const openapi = buildOpenApi(v1.routes, { version, basePath: '/api/v1' });
     // documentação pública (só descreve as rotas; chamar a API continua exigindo o token)
     app.get('/api/openapi.json', (req, res) => res.json(openapi));
-    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: 'MyZap API' }));
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: 'ConectZap API' }));
 
     app.use(auth.authenticate);
     // Prometheus: chave de API (bearer_token no scrape), API_TOKEN ou admin

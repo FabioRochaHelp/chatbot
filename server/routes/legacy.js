@@ -4,7 +4,7 @@ const express = require('express');
 const schemas = require('../schemas');
 const { validated } = require('../http');
 
-// rotas originais do MyZap: mesmo caminho, método e formato { result, message }
+// rotas originais do MyZap (projeto de origem do ConectZap): mesmo caminho, método e formato { result, message }
 module.exports = function legacyRoutes(Sessions) {
     const router = express.Router();
 

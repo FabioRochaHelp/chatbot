@@ -18,12 +18,12 @@ const time = (date: string) => new Date(date).toLocaleString('pt-BR', { dateStyl
 
 const VERIFY_SNIPPET = `// Node.js: confira com o corpo BRUTO da requisição (antes do JSON.parse)
 const crypto = require('crypto');
-const timestamp = req.headers['x-myzap-timestamp'];
+const timestamp = req.headers['x-conectzap-timestamp'];
 const expected = 'sha256=' + crypto
-    .createHmac('sha256', process.env.MYZAP_WEBHOOK_SECRET)
+    .createHmac('sha256', process.env.CONECTZAP_WEBHOOK_SECRET)
     .update(timestamp + '.' + rawBody)
     .digest('hex');
-const valid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(req.headers['x-myzap-signature'] || ''));
+const valid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(req.headers['x-conectzap-signature'] || ''));
 // recuse também timestamps muito antigos (ex.: mais de 5 minutos)`;
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -62,9 +62,9 @@ function SecretCard({ hook }: { hook: Webhook }) {
             <CardHeader>
                 <CardTitle>Assinatura</CardTitle>
                 <CardDescription>
-                    Cada envio leva <code>X-MyZap-Signature</code> (HMAC-SHA256 de <code>timestamp.corpo</code> com este
-                    segredo) e <code>X-MyZap-Timestamp</code>. Confira no seu sistema para ter certeza de que veio do
-                    MyZap.
+                    Cada envio leva <code>X-ConectZap-Signature</code> (HMAC-SHA256 de <code>timestamp.corpo</code> com
+                    este segredo) e <code>X-ConectZap-Timestamp</code>. Confira no seu sistema para ter certeza de que
+                    veio do ConectZap.
                 </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">

@@ -61,7 +61,7 @@ export function WebhookFields({
                     type="url"
                     value={form.url}
                     onChange={event => setForm({ ...form, url: event.target.value })}
-                    placeholder="https://seusistema.com/webhooks/myzap"
+                    placeholder="https://seusistema.com/webhooks/conectzap"
                     autoFocus
                 />
             </Field>

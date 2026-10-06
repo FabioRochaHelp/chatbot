@@ -2,7 +2,7 @@ import type { DragEvent } from 'react';
 import { NODE_META, PALETTE, type FlowNodeType } from '@/lib/flow-types';
 import { cn } from '@/lib/utils';
 
-export const DRAG_TYPE = 'application/x-myzap-node';
+export const DRAG_TYPE = 'application/x-conectzap-node';
 
 export function Palette({ onAdd }: { onAdd: (type: FlowNodeType) => void }) {
     const onDragStart = (event: DragEvent, type: FlowNodeType) => {

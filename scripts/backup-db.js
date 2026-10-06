@@ -3,7 +3,7 @@
 /**
  * Backup do SQLite: cópia consistente mesmo com o servidor rodando (API de backup do SQLite).
  * Uso: npm run db:backup [-- --keep 14]   (padrão: guarda os 14 mais recentes)
- * Arquivos em DATA_DIR/backups/myzap-AAAAMMDD-HHMMSS.db
+ * Arquivos em DATA_DIR/backups/conectzap-AAAAMMDD-HHMMSS.db
  */
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +21,7 @@ async function main() {
     const dir = path.join(config.dataDir, 'backups');
     fs.mkdirSync(dir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-    const target = path.join(dir, `myzap-${stamp}.db`);
+    const target = path.join(dir, `conectzap-${stamp}.db`);
 
     const db = new Database(source, { readonly: true, fileMustExist: true });
     await db.backup(target);
@@ -30,7 +30,7 @@ async function main() {
 
     const old = fs
         .readdirSync(dir)
-        .filter(name => /^myzap-\d{8}-\d{6}\.db$/.test(name))
+        .filter(name => /^(conectzap|myzap)-\d{8}-\d{6}\.db$/.test(name))
         .sort()
         .reverse()
         .slice(keep);

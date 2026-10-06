@@ -1,12 +1,8 @@
-# MyZap
+# ConectZap
 
 Plataforma open source de atendimento pelo WhatsApp: API para integrar sistemas, painel com inbox para a equipe, bot de fluxos com editor visual, assistentes de IA (Claude) e webhooks.
 
-[![Vídeo explicativo do projeto](https://img.youtube.com/vi/blOpjAS1Fik/0.jpg)](https://www.youtube.com/watch?v=blOpjAS1Fik)
-
-[Grupo do WhatsApp para dúvidas e ajuda (clique aqui)](https://chat.whatsapp.com/DMehlYDcMWiKmlIsOLGAQM)
-
-O MyZap usa o [WPPConnect](https://github.com/wppconnect-team/wppconnect): um Chromium sem interface abre o WhatsApp Web e o MyZap o controla por código. Cada **sessão** é um número de WhatsApp conectado lendo um QR code, como no WhatsApp Web.
+O ConectZap usa o [WPPConnect](https://github.com/wppconnect-team/wppconnect): um Chromium sem interface abre o WhatsApp Web e o ConectZap o controla por código. Cada **sessão** é um número de WhatsApp conectado lendo um QR code, como no WhatsApp Web.
 
 ## O que tem
 
@@ -21,8 +17,8 @@ O MyZap usa o [WPPConnect](https://github.com/wppconnect-team/wppconnect): um Ch
 ## Começando (Docker)
 
 ```bash
-git clone https://github.com/billbarsch/myzap.git
-cd myzap
+git clone https://github.com/FabioRochaHelp/chatbot.git
+cd chatbot
 cp .env_example .env      # defina ao menos ADMIN_EMAIL e ADMIN_PASSWORD
 docker compose up -d --build
 ```
@@ -31,10 +27,10 @@ docker compose up -d --build
 2. Em **Sessões → Nova sessão**, dê um nome (ex.: `loja`) e leia o QR code com o celular: *WhatsApp → Configurações → Aparelhos conectados → Conectar um aparelho*. O QR code expira em cerca de 1 minuto; se a sessão fechar, é só iniciar de novo.
 3. Pronto: as mensagens recebidas aparecem em **Atendimento**. Para respostas automáticas, crie um **Fluxo** ou um **Assistente de IA** e ligue em *Sessões → sessão → Bot*.
 
-Dados ficam em dois volumes: `myzap_tokens` (login do WhatsApp; reiniciar não pede QR de novo) e `myzap_data` (banco SQLite, mídias, segredo do login). As migrations do banco rodam sozinhas ao iniciar.
+Dados ficam em dois volumes (os nomes vêm de quando o projeto se chamava MyZap e foram mantidos para não perder dados): `myzap_tokens` (login do WhatsApp; reiniciar não pede QR de novo) e `myzap_data` (banco SQLite, mídias, segredo do login). As migrations do banco rodam sozinhas ao iniciar.
 
-- Logs: `docker compose logs -f myzap`
-- Desenvolvimento com hot-reload no container: `docker compose --profile dev up --build myzap-dev`
+- Logs: `docker compose logs -f conectzap` (ou `make logs`)
+- Desenvolvimento com hot-reload no container: `docker compose --profile dev up --build conectzap-dev`
 
 ## Configuração (`.env`)
 
@@ -52,7 +48,7 @@ Dados ficam em dois volumes: `myzap_tokens` (login do WhatsApp; reiniciar não p
 | `RATE_LIMIT_PER_MINUTE` | `600` | Requisições por minuto por IP (`0` desliga). |
 | `TRUST_PROXY` | — | `1` atrás de nginx/traefik, para o limite enxergar o IP real. |
 | `DATA_DIR` | `./data` | Banco, mídias e backups. |
-| `DATABASE_URL` | `file:DATA_DIR/myzap.db` | Caminho do SQLite. |
+| `DATABASE_URL` | `file:DATA_DIR/conectzap.db` | Caminho do SQLite. |
 | `DB_MIGRATE` | `1` | `0` desliga as migrations automáticas ao iniciar. |
 | `MEDIA_MAX_MB` | `50` | Tamanho máximo de mídia recebida que é baixada. |
 | `TOKENS_DIR` | `./tokens` | Login das sessões do WhatsApp. |
@@ -98,13 +94,13 @@ Blocos: mensagem, menu numerado, pergunta (qualquer texto, número, e-mail ou te
 ## API
 
 - **Documentação interativa:** `http://localhost:3333/api/docs` (Swagger) e `/api/openapi.json` (OpenAPI 3.1).
-- **Autenticação:** `Authorization: Bearer <chave>` com uma chave de API (`mzk_...`, criada em *Configurações → Chaves de API*) ou o `API_TOKEN`. O painel usa cookie de login.
+- **Autenticação:** `Authorization: Bearer <chave>` com uma chave de API (`czk_...`, criada em *Configurações → Chaves de API*; chaves antigas `mzk_` continuam valendo) ou o `API_TOKEN`. O painel usa cookie de login.
 - **Papéis:** administrador (tudo), atendente (conversas e contatos) e integração (chave de API: tudo menos usuários e chaves).
 - **Respostas:** sucesso em `{ "data": ... }` (listas com `meta`); erro em `{ "error": { "code", "message", "details" } }` com o status HTTP: 400 parâmetro inválido, 401, 403, 404, 409 sessão desconectada, 502 falha no WhatsApp.
 
 ```bash
 curl -X POST http://localhost:3333/api/v1/sessions/loja/messages \
-  -H "Authorization: Bearer $MYZAP_API_KEY" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CONECTZAP_API_KEY" -H "Content-Type: application/json" \
   -d '{"to": "5511999999999", "type": "text", "text": "Olá!"}'
 ```
 
@@ -130,7 +126,7 @@ Mensagens enviadas por essas rotas também ficam no histórico e aparecem no Ate
 
 ## Webhooks
 
-Cadastre em **Webhooks** (ou `POST /api/v1/webhooks`). Para cada evento escolhido, o MyZap envia um `POST` com JSON:
+Cadastre em **Webhooks** (ou `POST /api/v1/webhooks`). Para cada evento escolhido, o ConectZap envia um `POST` com JSON:
 
 ```json
 { "id": 42, "event": "message.received", "createdAt": "2026-10-06T14:32:00.000Z",
@@ -145,7 +141,7 @@ Cadastre em **Webhooks** (ou `POST /api/v1/webhooks`). Para cada evento escolhid
 | `conversation.handoff` | Bot ou IA transferiu para a fila (com o motivo). |
 | `session.state` | A sessão conectou, caiu ou pediu QR code. |
 
-- **Assinatura:** cada envio traz `X-MyZap-Timestamp` e `X-MyZap-Signature: sha256=<HMAC-SHA256 de "timestamp.corpo" com o segredo>`. Confira com o corpo bruto e recuse timestamps antigos. A tela do webhook tem o segredo e um exemplo em Node.js.
+- **Assinatura:** cada envio traz `X-ConectZap-Timestamp` e `X-ConectZap-Signature: sha256=<HMAC-SHA256 de "timestamp.corpo" com o segredo>`. Confira com o corpo bruto e recuse timestamps antigos. A tela do webhook tem o segredo e um exemplo em Node.js.
 - **Reenvio:** respostas fora de 2xx ou falhas de rede são reenviadas com espera crescente (10 s, 1 min, 5 min, 30 min, 2 h, 6 h), até 7 tentativas. Cada entrega pode ser reenviada à mão. O histórico guarda 7 dias.
 - Webhooks antigos de `/sendHook` continuam recebendo a mensagem original do WhatsApp, sem assinatura. Eles aparecem na lista e podem ser pausados ou removidos.
 
@@ -159,10 +155,10 @@ Socket.IO em `/socket.io`, autenticado pelo cookie do painel ou por `auth: { tok
 
 ```yaml
 scrape_configs:
-  - job_name: myzap
+  - job_name: conectzap
     metrics_path: /metrics
-    bearer_token: mzk_...   # chave de API criada no painel
-    static_configs: [{ targets: ['myzap:3333'] }]
+    bearer_token: czk_...   # chave de API criada no painel
+    static_configs: [{ targets: ['conectzap:3333'] }]
 ```
 
 Inclui sessões por estado, conversas por status, mensagens por direção e origem, transferências por motivo, fila e resultado dos webhooks, chamadas, tokens e tempo de resposta da IA, duração das requisições HTTP por rota e métricas do processo Node.
@@ -171,10 +167,10 @@ Inclui sessões por estado, conversas por status, mensagens por direção e orig
 
 ```bash
 npm run db:backup                            # fora do Docker
-docker compose exec myzap npm run db:backup  # no Docker
+docker compose exec conectzap npm run db:backup  # no Docker
 ```
 
-Cria uma cópia consistente do banco (mesmo com o servidor rodando) em `DATA_DIR/backups/` e mantém as 14 mais recentes (`-- --keep 30` para mudar). Para restaurar, pare o MyZap e troque `DATA_DIR/myzap.db` pelo backup. As mídias ficam em `DATA_DIR/media` e o login do WhatsApp no volume de tokens: inclua os dois no backup do servidor.
+Cria uma cópia consistente do banco (mesmo com o servidor rodando) em `DATA_DIR/backups/` e mantém as 14 mais recentes (`-- --keep 30` para mudar). Para restaurar, pare o ConectZap e troque o arquivo do banco em `DATA_DIR` (`conectzap.db`, ou `myzap.db` em instalações antigas) pelo backup. As mídias ficam em `DATA_DIR/media` e o login do WhatsApp no volume de tokens: inclua os dois no backup do servidor.
 
 O banco é SQLite, suficiente para uma instância com algumas sessões. Outros bancos (como PostgreSQL) ainda não são suportados: exigiriam trocar o `provider` em `prisma/schema.prisma`, o adapter em `server/db.js` e gerar migrations novas.
 
@@ -183,18 +179,18 @@ O banco é SQLite, suficiente para uma instância com algumas sessões. Outros b
 ```bash
 sudo apt install -y curl git chromium fonts-liberation ca-certificates
 curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs   # Node 22.12+ (24 LTS recomendado)
-git clone https://github.com/billbarsch/myzap.git && cd myzap
+git clone https://github.com/FabioRochaHelp/chatbot.git && cd chatbot
 PUPPETEER_SKIP_DOWNLOAD=true npm install
 npm run web:install && npm run build          # painel
 cp .env_example .env                          # CHROME_PATH=/usr/bin/chromium
 npm start
 ```
 
-Para manter rodando após reiniciar o servidor: `npm install -g pm2 && pm2 start index.js && pm2 startup`.
+Para manter rodando após reiniciar o servidor: `npm install -g pm2 && pm2 start index.js --name conectzap && pm2 startup`.
 
 ## HTTPS
 
-O recomendado é um proxy reverso (nginx, Caddy, Traefik) com HTTPS na frente do MyZap. Configure `TRUST_PROXY=1` e `COOKIE_SECURE=1` e encaminhe o WebSocket de `/socket.io`. No nginx:
+O recomendado é um proxy reverso (nginx, Caddy, Traefik) com HTTPS na frente do ConectZap. Configure `TRUST_PROXY=1` e `COOKIE_SECURE=1` e encaminhe o WebSocket de `/socket.io`. No nginx:
 
 ```nginx
 location / {
@@ -232,6 +228,7 @@ test/               testes (vitest + supertest; sem navegador nem WhatsApp)
 scripts/            backup do banco
 ```
 
+- `make` lista atalhos para os comandos abaixo e para o Docker (`make up`, `make logs`, `make backup`, `make check`...).
 - API com hot-reload: `npm run dev`. Painel: `npm run web:dev` (porta 5173, repassa `/api` e `/socket.io` para a 3333).
 - `npm run check` roda o que o CI roda: lint, formatação, testes e lint/typecheck do painel.
 - Depois de alterar `prisma/schema.prisma`: `npm run db:migrate -- --name <nome>`. Para ver o banco: `npm run db:studio`.
@@ -246,3 +243,9 @@ scripts/            backup do banco
 - O salvamento do token no jsonbin.io foi removido (não funciona com o WhatsApp multidevice). As sessões ficam no volume de tokens.
 - A resposta automática de demonstração `TESTEBOT` foi removida: use um fluxo ou um assistente de IA.
 - `ENGINE=VENOM` continua disponível, mas obsoleto.
+
+## Créditos
+
+O ConectZap nasceu do [MyZap](https://github.com/billbarsch/myzap), de Bill Barsch: a API original, as rotas compatíveis e a integração com o WhatsApp Web vêm de lá. Comunidade do projeto original: [vídeo explicativo](https://www.youtube.com/watch?v=blOpjAS1Fik) e [grupo no WhatsApp](https://chat.whatsapp.com/DMehlYDcMWiKmlIsOLGAQM).
+
+Para quem vem do MyZap: os volumes do Docker (`myzap_tokens`, `myzap_data`), o banco `myzap.db` e as chaves de API `mzk_` continuam funcionando. Mudaram os cabeçalhos dos webhooks (`X-ConectZap-*`), o prefixo das métricas (`conectzap_*`), o nome do serviço no Docker (`conectzap`) e o cookie do painel (é preciso entrar de novo uma vez).

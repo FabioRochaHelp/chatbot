@@ -9,50 +9,50 @@ const events = require('./events');
  * Contadores são alimentados pelo barramento de eventos; gauges consultam o estado na hora da coleta.
  */
 const registry = new client.Registry();
-registry.setDefaultLabels({ app: 'myzap' });
-client.collectDefaultMetrics({ register: registry, prefix: 'myzap_' });
+registry.setDefaultLabels({ app: 'conectzap' });
+client.collectDefaultMetrics({ register: registry, prefix: 'conectzap_' });
 
 let Sessions = null;
 
 const messages = new client.Counter({
-    name: 'myzap_messages_total',
+    name: 'conectzap_messages_total',
     help: 'Mensagens gravadas no histórico',
     labelNames: ['direction', 'origin'],
     registers: [registry]
 });
 const handoffs = new client.Counter({
-    name: 'myzap_handoffs_total',
+    name: 'conectzap_handoffs_total',
     help: 'Conversas transferidas do bot para a fila',
     labelNames: ['reason'],
     registers: [registry]
 });
 const webhookDeliveries = new client.Counter({
-    name: 'myzap_webhook_deliveries_total',
+    name: 'conectzap_webhook_deliveries_total',
     help: 'Tentativas de entrega de webhook',
     labelNames: ['result'],
     registers: [registry]
 });
 const aiReplies = new client.Counter({
-    name: 'myzap_ai_replies_total',
+    name: 'conectzap_ai_replies_total',
     help: 'Chamadas à IA por resultado',
     labelNames: ['model', 'outcome'],
     registers: [registry]
 });
 const aiTokens = new client.Counter({
-    name: 'myzap_ai_tokens_total',
+    name: 'conectzap_ai_tokens_total',
     help: 'Tokens da IA por tipo',
     labelNames: ['model', 'type'],
     registers: [registry]
 });
 const aiDuration = new client.Histogram({
-    name: 'myzap_ai_request_duration_seconds',
+    name: 'conectzap_ai_request_duration_seconds',
     help: 'Tempo de resposta da IA',
     labelNames: ['model'],
     buckets: [0.5, 1, 2, 4, 8, 15, 30, 60],
     registers: [registry]
 });
 const httpRequests = new client.Histogram({
-    name: 'myzap_http_request_duration_seconds',
+    name: 'conectzap_http_request_duration_seconds',
     help: 'Requisições HTTP por rota',
     labelNames: ['method', 'route', 'status'],
     buckets: [0.01, 0.05, 0.1, 0.3, 1, 3, 10],
@@ -60,7 +60,7 @@ const httpRequests = new client.Histogram({
 });
 
 new client.Gauge({
-    name: 'myzap_sessions',
+    name: 'conectzap_sessions',
     help: 'Sessões do WhatsApp por estado',
     labelNames: ['state'],
     registers: [registry],
@@ -70,7 +70,7 @@ new client.Gauge({
     }
 });
 new client.Gauge({
-    name: 'myzap_conversations',
+    name: 'conectzap_conversations',
     help: 'Conversas abertas por status',
     labelNames: ['status'],
     registers: [registry],
@@ -86,7 +86,7 @@ new client.Gauge({
     }
 });
 new client.Gauge({
-    name: 'myzap_webhook_queue',
+    name: 'conectzap_webhook_queue',
     help: 'Entregas de webhook aguardando envio',
     registers: [registry],
     async collect() {
