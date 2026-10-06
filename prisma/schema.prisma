@@ -108,6 +108,7 @@ model Message {
 
   @@unique([sessionId, waMessageId])
   @@index([conversationId, id])
+  @@index([timestamp])
 }
 
 model User {

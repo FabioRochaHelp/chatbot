@@ -3,3 +3,4 @@ tokens
 examples
 package-lock.json
 *.md
+web/dist

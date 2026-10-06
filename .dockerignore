@@ -17,3 +17,5 @@ eslint.config.mjs
 .prettierrc.json
 .prettierignore
 data
+web/node_modules
+web/dist

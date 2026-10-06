@@ -9,6 +9,9 @@
     "scripts": {
         "start": "node index.js",
         "dev": "node --watch index.js",
+        "web:install": "npm --prefix web ci",
+        "web:dev": "npm --prefix web run dev",
+        "build": "npm --prefix web run build",
         "postinstall": "prisma generate",
         "db:migrate": "prisma migrate dev",
         "db:studio": "prisma studio",
@@ -17,7 +20,7 @@
         "lint": "eslint .",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "check": "npm run lint && npm run format:check && npm test"
+        "check": "npm run lint && npm run format:check && npm test && npm --prefix web run lint && npm --prefix web run typecheck"
     },
     "author": "Bill Barsch",
     "license": "ISC",

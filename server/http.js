@@ -70,6 +70,12 @@ function errorHandler(error, req, res, next) {
     if (error.type === 'entity.too.large') {
         return res.status(413).json(errorBody(req, 'PAYLOAD_TOO_LARGE', 'payload muito grande'));
     }
+    // erros HTTP do Express/middlewares (ex.: 404 do express.static)
+    const status = error.status || error.statusCode;
+    if (status >= 400 && status < 500) {
+        const code = status === 404 ? 'NOT_FOUND' : 'HTTP_' + status;
+        return res.status(status).json(errorBody(req, code, error.expose ? error.message : code));
+    }
     log.error({ err: error, method: req.method, url: req.path }, 'erro não tratado');
     if (req.originalUrl.startsWith('/api/')) {
         return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'erro interno' } });

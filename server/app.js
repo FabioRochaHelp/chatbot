@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const http = require('./http');
 const auth = require('./auth');
@@ -23,7 +25,13 @@ function createApp(deps = {}) {
     app.use(http.security(config));
     app.use(express.json({ limit: '20mb' }));
 
-    app.get('/', (req, res) => res.json({ result: 'ok' }));
+    app.get('/health', (req, res) => res.json({ result: 'ok' }));
+    const spa = webApp(deps.webDir || path.join(__dirname, '..', 'web', 'dist'));
+    // GET / devolve JSON (healthcheck e clientes antigos), a não ser que o navegador peça HTML
+    app.get('/', (req, res, next) =>
+        spa && req.accepts(['json', 'html']) === 'html' ? next() : res.json({ result: 'ok' })
+    );
+    if (spa) app.use(spa);
 
     const v1 = v1Routes({ Sessions });
     const openapi = buildOpenApi(v1.routes, { version, basePath: '/api/v1' });
@@ -38,6 +46,27 @@ function createApp(deps = {}) {
     app.use(http.notFound);
     app.use(http.errorHandler);
     return app;
+}
+
+// rotas do painel (React Router); lista fixa para não colidir com as rotas antigas (/status, /qrcode...)
+const SPA_ROUTES = /^\/(login|setup|sessions|send|inbox|flows|ai|webhooks|settings)?(\/.*)?$/;
+
+/** Serve o build do painel (web/dist), se existir. */
+function webApp(dir) {
+    const index = path.join(dir, 'index.html');
+    if (!fs.existsSync(index)) return null;
+    const router = express.Router();
+    router.use(
+        '/assets',
+        express.static(path.join(dir, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false })
+    );
+    router.use(express.static(dir, { index: false }));
+    router.get(SPA_ROUTES, (req, res, next) => {
+        if (req.accepts(['json', 'html']) !== 'html') return next();
+        res.setHeader('Cache-Control', 'no-cache');
+        res.sendFile(index);
+    });
+    return router;
 }
 
 module.exports = { createApp };

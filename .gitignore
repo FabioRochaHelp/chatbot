@@ -6,3 +6,4 @@ tmp
 deploy.sh
 database/*.sqlite
 data/
+web/dist

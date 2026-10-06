@@ -48,10 +48,24 @@ server/
   sessions.js       ciclo de vida das sessões do WhatsApp
   engine/           adapters wppconnect / venom
 test/               testes (vitest + supertest, sem navegador)
+web/                painel React (build em web/dist, servido pelo Express)
 ```
 
 - `npm run db:migrate -- --name <nome>` cria uma migration depois de alterar `prisma/schema.prisma`; `npm run db:studio` abre o banco no navegador.
-- `npm test` · `npm run lint` · `npm run format` · `npm run check` (tudo o que o CI roda)
+- `npm test` · `npm run lint` · `npm run format` · `npm run check` (tudo o que o CI roda, inclusive lint e typecheck do painel)
+- O painel fica em `web/` (React + Vite + TypeScript + Tailwind), com `package.json` próprio.
+
+## Painel
+
+Abra `http://localhost:3333` no navegador. No primeiro acesso o painel pede para criar o administrador.
+
+- **Painel:** sessões conectadas, conversas aguardando atendente, não lidas e mensagens dos últimos 7 dias.
+- **Sessões:** criar, conectar lendo o QR code (atualiza ao vivo), reconectar e fechar.
+- **Enviar mensagem:** teste de envio (texto, arquivo, localização, link) com o `curl` equivalente para a sua integração.
+- Tema claro/escuro e layout para celular.
+
+A imagem Docker já traz o painel compilado. Fora do Docker: `npm run web:install && npm run build`.
+Para desenvolver o painel com hot-reload: `npm run dev` (API na 3333) e, em outro terminal, `npm run web:dev` (abre na 5173, repassando `/api` e `/socket.io` para a 3333).
 
 ## Usuários, chaves de API e tempo real
 
