@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
-import Sessions from '../server/sessions.js';
-import store from '../server/store.js';
-import { db, disconnect } from '../server/db.js';
+import { Sessions, server, db, disconnect, resetAll } from './helpers.js';
+
+const store = server('../server/store.js');
 
 // não abre navegador: launch() só é chamado, não executado
 const launch = vi.spyOn(Sessions, 'launch').mockImplementation(() => undefined);
@@ -9,9 +9,8 @@ const launch = vi.spyOn(Sessions, 'launch').mockImplementation(() => undefined);
 afterAll(() => disconnect());
 
 beforeEach(async () => {
-    Sessions.sessions = [];
+    await resetAll();
     launch.mockClear();
-    await db().session.deleteMany();
 });
 
 describe('persistência de sessões', () => {

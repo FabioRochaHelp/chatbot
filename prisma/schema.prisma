@@ -7,17 +7,20 @@ datasource db {
 }
 
 model Session {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  engine    String
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  engine        String
   // reinicia a sessão quando o servidor sobe; /close desliga
-  autoStart Boolean   @default(true)
+  autoStart     Boolean        @default(true)
   // off | flow | ai | flow+ai (usado pelo pipeline do chatbot)
-  botMode   String    @default("off")
-  lastState String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  webhooks  Webhook[]
+  botMode       String         @default("off")
+  lastState     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  webhooks      Webhook[]
+  contacts      Contact[]
+  conversations Conversation[]
+  messages      Message[]
 }
 
 model Webhook {
@@ -36,4 +39,73 @@ model Webhook {
   updatedAt DateTime @updatedAt
 
   @@index([sessionId])
+}
+
+model Contact {
+  id            Int            @id @default(autoincrement())
+  sessionId     Int
+  session       Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  // id no WhatsApp: 5511999999999@c.us ou ...@g.us
+  waId          String
+  // nome definido no painel; pushName é o que o próprio contato configurou
+  name          String?
+  pushName      String?
+  isGroup       Boolean        @default(false)
+  tags          Json           @default("[]")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+
+  @@unique([sessionId, waId])
+}
+
+model Conversation {
+  id             Int       @id @default(autoincrement())
+  sessionId      Int
+  session        Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  contactId      Int
+  contact        Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  // bot | pending (aguardando atendente) | open (com atendente) | closed
+  status         String    @default("bot")
+  assignedUserId Int?
+  // estado do motor de fluxos (nó atual, variáveis)
+  flowState      Json?
+  unreadCount    Int       @default(0)
+  lastMessageAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  closedAt       DateTime?
+  messages       Message[]
+
+  @@index([sessionId, status, lastMessageAt])
+  @@index([contactId, status])
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  sessionId      Int
+  session        Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  conversationId Int
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  waMessageId    String?
+  // in (recebida) | out (enviada)
+  direction      String
+  // contact | phone (enviada pelo celular) | api | bot | agent
+  origin         String
+  // chat, image, video, audio, ptt, document, sticker, location, vcard, link...
+  type           String
+  body           String?
+  caption        String?
+  // participante que enviou (mensagens de grupo)
+  author         String?
+  mediaPath      String?
+  mimeType       String?
+  fileName       String?
+  // dados extras por tipo (localização, vcard, link)
+  payload        Json?
+  sentByUserId   Int?
+  timestamp      DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  @@unique([sessionId, waMessageId])
+  @@index([conversationId, id])
 }

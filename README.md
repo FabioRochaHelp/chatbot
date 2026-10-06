@@ -53,6 +53,21 @@ test/               testes (vitest + supertest, sem navegador)
 - `npm run db:migrate -- --name <nome>` cria uma migration depois de alterar `prisma/schema.prisma`; `npm run db:studio` abre o banco no navegador.
 - `npm test` · `npm run lint` · `npm run format` · `npm run check` (tudo o que o CI roda)
 
+## API v1 e documentação
+
+- **Documentação interativa:** `http://localhost:3333/api/docs` (Swagger). A especificação OpenAPI 3.1 fica em `/api/openapi.json`. Clique em *Authorize* e informe o `API_TOKEN`.
+- Rotas em `/api/v1`: sessões (criar, iniciar, fechar, QR code), envio de mensagens (`text`, `file`, `voice`, `location`, `link`, `contact`), conversas, contatos e mídias.
+- Sucesso: `{ "data": ... }` (listas: `{ "data": [...], "meta": { "total", "limit", "offset" } }`). Erro: `{ "error": { "code", "message", "details" } }` com o status HTTP correspondente (400, 401, 404, 409 sessão desconectada, 502 falha no WhatsApp).
+- **Histórico:** toda mensagem recebida ou enviada (pela API, pelas rotas antigas ou pelo próprio celular) fica gravada com contato e conversa. As mídias recebidas são baixadas para `DATA_DIR/media` (limite `MEDIA_MAX_MB`, padrão 50).
+
+```bash
+curl -X POST http://localhost:3333/api/v1/sessions/session1/messages \
+  -H "Authorization: Bearer $API_TOKEN" -H "Content-Type: application/json" \
+  -d '{"to": "556334140378", "type": "text", "text": "Olá!"}'
+```
+
+As rotas antigas abaixo (`/start`, `/sendText`...) continuam funcionando como antes.
+
 ## Setup manual (sem Docker)
 
 `sudo apt install -y curl git chromium fonts-liberation ca-certificates`

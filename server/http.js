@@ -6,6 +6,12 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const log = require('./logger');
 
+// /api/* usa o formato da v1 ({ error: { code, message } }); o resto, o formato antigo
+function errorBody(req, code, message) {
+    if (req.originalUrl.startsWith('/api/')) return { error: { code, message: message || code } };
+    return { result: 'error', message: code };
+}
+
 // Express 4 não captura rejeições de handlers async
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -49,14 +55,18 @@ function auth(apiToken) {
             }
         }
         if (token && safeEqual(token, apiToken)) return next();
-        res.status(401).json({ result: 'error', message: 'UNAUTHORIZED' });
+        res.status(401).json(errorBody(req, 'UNAUTHORIZED', 'token ausente ou inválido'));
     };
 }
 
 function security(config) {
     const middlewares = [
         // cross-origin: o PNG de /qrcode?image=true costuma ser usado em <img> de outros sites
-        helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }),
+        helmet({
+            crossOriginResourcePolicy: { policy: 'cross-origin' },
+            // sem HTTPS próprio, upgrade-insecure-requests quebra o acesso por http://<ip>:3333
+            contentSecurityPolicy: { directives: { upgradeInsecureRequests: config.https ? [] : null } }
+        }),
         cors(config.corsOrigins.length ? { origin: config.corsOrigins } : undefined)
     ];
     if (config.rateLimit > 0) {
@@ -66,7 +76,8 @@ function security(config) {
                 limit: config.rateLimit,
                 standardHeaders: 'draft-8',
                 legacyHeaders: false,
-                message: { result: 'error', message: 'TOO_MANY_REQUESTS' }
+                handler: (req, res, next, options) =>
+                    res.status(options.statusCode).json(errorBody(req, 'TOO_MANY_REQUESTS', 'muitas requisições'))
             })
         );
     }
@@ -74,18 +85,21 @@ function security(config) {
 }
 
 function notFound(req, res) {
-    res.status(404).json({ result: 'error', message: 'ROUTE_NOT_FOUND' });
+    res.status(404).json(errorBody(req, 'ROUTE_NOT_FOUND', 'rota não encontrada'));
 }
 
 // Express reconhece o error handler pelos 4 parâmetros
 function errorHandler(error, req, res, next) {
     if (error.type === 'entity.parse.failed') {
-        return res.status(400).json({ result: 'error', message: 'INVALID_JSON' });
+        return res.status(400).json(errorBody(req, 'INVALID_JSON', 'JSON inválido'));
     }
     if (error.type === 'entity.too.large') {
-        return res.status(413).json({ result: 'error', message: 'PAYLOAD_TOO_LARGE' });
+        return res.status(413).json(errorBody(req, 'PAYLOAD_TOO_LARGE', 'payload muito grande'));
     }
     log.error({ err: error, method: req.method, url: req.path }, 'erro não tratado');
+    if (req.originalUrl.startsWith('/api/')) {
+        return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'erro interno' } });
+    }
     res.status(500).json({ result: 'error', message: error.message || 'INTERNAL_ERROR' });
 }
 

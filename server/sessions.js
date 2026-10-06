@@ -1,12 +1,13 @@
 'use strict';
 
-const os = require('os');
-const fs = require('fs');
-const path = require('path');
 const axios = require('axios');
 const config = require('./config');
 const engine = require('./engine');
 const store = require('./store');
+const history = require('./history');
+const messaging = require('./messaging');
+const events = require('./events');
+const { AppError } = require('./errors');
 const log = require('./logger');
 
 // o shutdown (SIGTERM/SIGINT) é feito pelo index.js, que fecha as sessões em ordem
@@ -129,6 +130,7 @@ module.exports = class Sessions {
             if (session.generation !== generation) return;
             session.state = 'QRCODE';
             session.qrcode = base64Qrimg;
+            events.emit('session.qrcode', { session: session.name, qrcode: base64Qrimg });
             session.CodeasciiQR = asciiQR;
             session.CodeurlCode = urlCode;
         };
@@ -173,12 +175,20 @@ module.exports = class Sessions {
             if (session.generation !== generation) return;
             session.state = state;
             store.setLastState(sessionName, state);
+            events.emit('session.state', { session: sessionName, state });
             if (state == 'CONNECTED' && config.jsonbinio && session.browserSessionToken == undefined) {
                 //salva dados do token da sessão na nuvem
                 setTimeout(() => Sessions.saveCloudToken(client), 2000);
             }
             log.info({ session: sessionName, state: state }, 'onStateChange');
         });
+        // onAnyMessage também traz o que foi enviado pelo celular (fromMe)
+        if (typeof client.onAnyMessage === 'function') {
+            client.onAnyMessage(message => {
+                if (session.generation !== generation) return;
+                history.recordIncoming(sessionName, message, client);
+            });
+        }
         client.onMessage(async message => {
             var session = Sessions.getSession(sessionName);
             if (session.hook != null) {
@@ -304,35 +314,27 @@ module.exports = class Sessions {
         }
     } //withClient
 
-    static async sendText(sessionName, to, text) {
-        return Sessions.withClient(sessionName, async client => {
-            log.debug({ session: sessionName, to: to }, 'sendText');
-            await client.sendText(to, text);
+    /** Envio pelas rotas antigas: { result: "success" } ou { result: "error", message }. */
+    static async legacySend(sessionName, content) {
+        try {
+            await messaging.send(Sessions, sessionName, content);
             return { result: 'success' };
-        });
+        } catch (error) {
+            if (error instanceof AppError) return { result: 'error', message: error.legacyMessage };
+            throw error;
+        }
+    } //legacySend
+
+    static async sendText(sessionName, to, text) {
+        return Sessions.legacySend(sessionName, { type: 'text', to, text });
     } //message
 
     static async sendTextToStorie(sessionName, text) {
         return Sessions.sendText(sessionName, 'status@broadcast', text);
     } //message to storie
 
-    static async sendBase64File(session, client, to, base64Data, fileName, caption) {
-        var folderName = fs.mkdtempSync(path.join(os.tmpdir(), session.name + '-'));
-        try {
-            var safeName = path.basename(fileName);
-            var filePath = path.join(folderName, safeName);
-            fs.writeFileSync(filePath, base64Data, 'base64');
-            await client.sendFile(to, filePath, safeName, caption);
-        } finally {
-            fs.rmSync(folderName, { recursive: true, force: true });
-        }
-    } //sendBase64File
-
     static async sendFile(sessionName, to, base64Data, fileName, caption) {
-        return Sessions.withClient(sessionName, async (client, session) => {
-            await Sessions.sendBase64File(session, client, to, base64Data, fileName, caption);
-            return { result: 'success' };
-        });
+        return Sessions.legacySend(sessionName, { type: 'file', to, base64: base64Data, fileName, caption });
     } //message
 
     static async sendImageStorie(sessionName, base64Data, fileName, caption) {
@@ -350,31 +352,19 @@ module.exports = class Sessions {
     } //saveHook
 
     static async sendContactVcard(sessionName, to, contactId, nameCard) {
-        return Sessions.withClient(sessionName, async client => {
-            await client.sendContactVcard(to, contactId, nameCard);
-            return { result: 'success' };
-        });
+        return Sessions.legacySend(sessionName, { type: 'contact', to, contact: contactId, name: nameCard });
     } //vcard
 
     static async sendVoice(sessionName, to, voice) {
-        return Sessions.withClient(sessionName, async client => {
-            await engine.sendVoice(client, to, voice);
-            return { result: 'success' };
-        });
+        return Sessions.legacySend(sessionName, { type: 'voice', to, base64: voice });
     } //voice
 
     static async sendLocation(sessionName, to, lat, long, local) {
-        return Sessions.withClient(sessionName, async client => {
-            await client.sendLocation(to, lat, long, local);
-            return { result: 'success' };
-        });
+        return Sessions.legacySend(sessionName, { type: 'location', to, lat, lng: long, name: local });
     } //location
 
     static async sendLinkPreview(sessionName, to, url, caption) {
-        return Sessions.withClient(sessionName, async client => {
-            await engine.sendLinkPreview(client, to, url, caption);
-            return { result: 'success' };
-        });
+        return Sessions.legacySend(sessionName, { type: 'link', to, url, caption });
     } //link
 
     static async getAllChatsNewMsg(sessionName) {

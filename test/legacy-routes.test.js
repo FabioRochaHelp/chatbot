@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
-import { createApp } from '../server/app.js';
+import { createApp } from './helpers.js';
 
 const baseConfig = { apiToken: null, corsOrigins: [], rateLimit: 0, trustProxy: false };
 const PNG = 'data:image/png;base64,' + Buffer.from('fake-png').toString('base64');

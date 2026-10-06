@@ -35,6 +35,8 @@ module.exports = {
     dataDir: dataDir,
     databaseUrl: process.env.DATABASE_URL || 'file:' + path.join(dataDir, 'myzap.db'),
     dbMigrate: process.env.DB_MIGRATE !== '0',
+    mediaDir: path.join(dataDir, 'media'),
+    mediaMaxBytes: (parseInt(process.env.MEDIA_MAX_MB, 10) || 50) * 1024 * 1024,
     chromePath: process.env.CHROME_PATH || undefined,
     apiToken: process.env.API_TOKEN || null,
     https: process.env.HTTPS == 1,

@@ -24,6 +24,8 @@ const optionalText = z.string().optional();
 const coordinate = z.union([z.string().min(1), z.number()]);
 
 module.exports = {
+    sessionName,
+    chatId,
     session: z.object({ sessionName }),
     qrcode: z.object({ sessionName, image: z.any().optional() }),
     hook: z.object({ sessionName, hook: z.union([z.url(), z.literal(''), z.null()]).optional() }),

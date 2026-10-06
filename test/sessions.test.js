@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import Sessions from '../server/sessions.js';
-import wppconnect from '../server/engine/wppconnect.js';
-import venom from '../server/engine/venom.js';
+import { Sessions, server } from './helpers.js';
+
+const wppconnect = server('../server/engine/wppconnect.js');
+const venom = server('../server/engine/venom.js');
 
 function connected(name, client) {
     const session = { name, state: 'CONNECTED', client: Promise.resolve(client) };
