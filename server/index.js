@@ -6,6 +6,10 @@ const config = require('./config');
 const log = require('./logger');
 const Sessions = require('./sessions');
 const { createApp } = require('./app');
+const { disconnect } = require('./db');
+const { migrate } = require('./migrate');
+
+migrate();
 
 const app = createApp({ config, sessions: Sessions });
 
@@ -30,13 +34,18 @@ if (config.https) {
     });
 } //http
 
+server.once('listening', () => {
+    Sessions.restore().catch(error => log.error({ err: error }, 'falha ao restaurar sessões'));
+});
+
 var shuttingDown = false;
 async function shutdown(signal, exitCode = 0) {
     if (shuttingDown) return;
     shuttingDown = true;
     log.info({ signal }, 'fechando sessões...');
     server.close();
-    await Promise.all(Sessions.getSessions().map(session => Sessions.closeSession(session.name)));
+    await Promise.all(Sessions.getSessions().map(session => Sessions.closeSession(session.name, { shutdown: true })));
+    await disconnect().catch(() => null);
     process.exit(exitCode);
 } //shutdown
 

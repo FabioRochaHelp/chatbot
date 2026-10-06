@@ -10,6 +10,8 @@ if (!ENGINES.includes(engine)) {
     throw new Error('ENGINE inválido: "' + process.env.ENGINE + '". Use ' + ENGINES.join(' ou '));
 }
 
+const dataDir = path.resolve(process.env.DATA_DIR || './data');
+
 function list(value) {
     return (value || '')
         .split(',')
@@ -30,6 +32,9 @@ module.exports = {
     port: parseInt(process.env.PORT, 10) || 3333,
     engine: engine,
     tokensDir: path.resolve(process.env.TOKENS_DIR || './tokens'),
+    dataDir: dataDir,
+    databaseUrl: process.env.DATABASE_URL || 'file:' + path.join(dataDir, 'myzap.db'),
+    dbMigrate: process.env.DB_MIGRATE !== '0',
     chromePath: process.env.CHROME_PATH || undefined,
     apiToken: process.env.API_TOKEN || null,
     https: process.env.HTTPS == 1,

@@ -16,3 +16,4 @@ vitest.config.mjs
 eslint.config.mjs
 .prettierrc.json
 .prettierignore
+data

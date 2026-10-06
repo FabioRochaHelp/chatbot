@@ -14,6 +14,7 @@ services:
       - "${PORT:-3333}:3333"
     volumes:
       - myzap_tokens:/usr/src/app/tokens
+      - myzap_data:/usr/src/app/data
     shm_size: 1gb
     restart: unless-stopped
     stop_grace_period: 30s
@@ -48,6 +49,7 @@ services:
 
 volumes:
   myzap_tokens:
+  myzap_data:
 
 networks:
   backend:

@@ -11,7 +11,7 @@ Este projeto usa como base o [Venom-bot](https://github.com/orkestral/venom) ou 
 
 ## Docker (recomendado)
 
-A imagem (`node:20-bookworm-slim` + Chromium do Debian) já traz todas as dependências de sistema.
+A imagem (`node:24-bookworm-slim` + Chromium do Debian) já traz todas as dependências de sistema.
 
 ```bash
 git clone https://github.com/billbarsch/myzap.git
@@ -22,6 +22,7 @@ docker compose up -d --build
 
 - A API sobe em `http://localhost:3333` (troque a porta do host com `PORT` no `.env`).
 - As sessões ficam no volume `myzap_tokens`, então reiniciar o container não exige ler o QR code de novo.
+- Sessões e webhooks ficam salvos em SQLite no volume `myzap_data` (as migrations rodam sozinhas ao iniciar). Uma sessão iniciada com `/start` volta sozinha quando o servidor reinicia; `/close` desliga esse retorno.
 - Variáveis do `.env`:
   - `ENGINE=WPPCONNECT` (padrão) ou `ENGINE=VENOM`. Obs.: o venom-bot não tem releases desde 11/2024 e, em testes de 10/2026, abre o WhatsApp Web mas não gera o QR code. Prefira o WPPCONNECT.
   - `API_TOKEN=<segredo>`: protege todas as rotas (exceto `/`). Envie `Authorization: Bearer <segredo>` ou `?token=<segredo>`.
@@ -49,6 +50,7 @@ server/
 test/               testes (vitest + supertest, sem navegador)
 ```
 
+- `npm run db:migrate -- --name <nome>` cria uma migration depois de alterar `prisma/schema.prisma`; `npm run db:studio` abre o banco no navegador.
 - `npm test` · `npm run lint` · `npm run format` · `npm run check` (tudo o que o CI roda)
 
 ## Setup manual (sem Docker)
@@ -56,10 +58,10 @@ test/               testes (vitest + supertest, sem navegador)
 `sudo apt install -y curl git chromium fonts-liberation ca-certificates`
 - o pacote `chromium` instala as bibliotecas de sistema necessárias (libnss3, libgbm, libgtk-3...)
 
-`curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -`
+`curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -`
 
 `sudo apt install -y nodejs`
-- Node.js 20 ou superior
+- Node.js 22 ou superior (24 LTS recomendado)
 
 `git clone https://github.com/billbarsch/myzap.git`
 

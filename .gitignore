@@ -5,3 +5,4 @@ tmp
 .env.prod
 deploy.sh
 database/*.sqlite
+data/

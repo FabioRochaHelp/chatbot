@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Session {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  engine    String
+  // reinicia a sessão quando o servidor sobe; /close desliga
+  autoStart Boolean   @default(true)
+  // off | flow | ai | flow+ai (usado pelo pipeline do chatbot)
+  botMode   String    @default("off")
+  lastState String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  webhooks  Webhook[]
+}
+
+model Webhook {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  url       String
+  // segredo para assinatura HMAC (webhooks v2)
+  secret    String?
+  // eventos assinados, ex.: ["message.received"]
+  events    Json     @default("[\"message.received\"]")
+  active    Boolean  @default(true)
+  // criado pela rota antiga /sendHook (um por sessão)
+  legacy    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId])
+}

@@ -6,12 +6,15 @@ const path = require('path');
 const axios = require('axios');
 const config = require('./config');
 const engine = require('./engine');
+const store = require('./store');
 const log = require('./logger');
 
 // o shutdown (SIGTERM/SIGINT) é feito pelo index.js, que fecha as sessões em ordem
 // (o puppeteer continua matando o navegador no evento 'exit' do processo)
 const PUPPETEER_SIGNALS = { handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false };
 const CLOSE_TIMEOUT = 5000;
+// intervalo entre as sessões restauradas no boot (cada uma abre um Chromium)
+const RESTORE_INTERVAL = 1500;
 
 // API v3 do jsonbin.io (a v2 "/b/<id>" + "secret-key" foi descontinuada)
 const jsonbin = {
@@ -51,8 +54,20 @@ module.exports = class Sessions {
         } else {
             log.debug({ session: sessionName, state: session.state }, 'sessão já ativa');
         }
+        await store.saveSession(sessionName);
         return session;
     } //start
+
+    /** Reinicia as sessões com autoStart (chamado quando o servidor sobe). */
+    static async restore() {
+        const names = await store.listAutoStart();
+        for (const [index, name] of names.entries()) {
+            if (index > 0) await new Promise(resolve => setTimeout(resolve, RESTORE_INTERVAL));
+            log.info({ session: name }, 'restaurando sessão');
+            await Sessions.start(name);
+        }
+        return names;
+    } //restore
 
     static async getStatus(sessionName) {
         Sessions.sessions = Sessions.sessions || [];
@@ -62,7 +77,7 @@ module.exports = class Sessions {
     static async addSesssion(sessionName) {
         var newSession = {
             name: sessionName,
-            hook: null,
+            hook: await store.getLegacyHook(sessionName),
             qrcode: false,
             client: false,
             status: 'notLogged',
@@ -157,6 +172,7 @@ module.exports = class Sessions {
         client.onStateChange(state => {
             if (session.generation !== generation) return;
             session.state = state;
+            store.setLastState(sessionName, state);
             if (state == 'CONNECTED' && config.jsonbinio && session.browserSessionToken == undefined) {
                 //salva dados do token da sessão na nuvem
                 setTimeout(() => Sessions.saveCloudToken(client), 2000);
@@ -203,8 +219,13 @@ module.exports = class Sessions {
         }
     } //clearCloudToken
 
-    static async closeSession(sessionName) {
+    /**
+     * Fecha a sessão. Fechar pela API desliga o autoStart; no shutdown do servidor
+     * ({ shutdown: true }) a sessão continua marcada para voltar no próximo boot.
+     */
+    static async closeSession(sessionName, { shutdown = false } = {}) {
         var session = Sessions.getSession(sessionName);
+        if (session && !shutdown) await store.setAutoStart(sessionName, false);
         if (session) {
             if (session.state != 'CLOSED') {
                 session.generation = (session.generation || 0) + 1;
@@ -230,6 +251,7 @@ module.exports = class Sessions {
                 }
                 session.browser = null;
                 session.state = 'CLOSED';
+                if (!shutdown) store.setLastState(sessionName, 'CLOSED');
                 session.client = false;
                 log.info({ session: sessionName }, 'sessão fechada');
                 return { result: 'success', message: 'CLOSED' };
@@ -323,6 +345,7 @@ module.exports = class Sessions {
             return { result: 'error', message: 'Session not found' };
         }
         session.hook = hook || null;
+        await store.saveLegacyHook(sessionName, session.hook);
         return { result: 'success', message: 'Hook Atualizado' };
     } //saveHook
 
