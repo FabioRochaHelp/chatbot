@@ -10,3 +10,9 @@ examples
 Dockerfile
 docker-compose.yml
 Procfile
+.github
+test
+vitest.config.mjs
+eslint.config.mjs
+.prettierrc.json
+.prettierignore

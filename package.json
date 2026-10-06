@@ -9,7 +9,12 @@
     "scripts": {
         "start": "node index.js",
         "dev": "node --watch index.js",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "eslint .",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "check": "npm run lint && npm run format:check && npm test"
     },
     "author": "Bill Barsch",
     "license": "ISC",
@@ -19,6 +24,19 @@
         "cors": "2.8.6",
         "dotenv": "16.6.1",
         "express": "4.22.3",
-        "venom-bot": "5.3.0"
+        "express-rate-limit": "8.7.1",
+        "helmet": "8.3.0",
+        "pino": "10.4.0",
+        "venom-bot": "5.3.0",
+        "zod": "4.6.5"
+    },
+    "devDependencies": {
+        "@eslint/js": "10.0.1",
+        "eslint": "10.12.0",
+        "globals": "17.13.0",
+        "pino-pretty": "13.2.0",
+        "prettier": "3.9.9",
+        "supertest": "7.3.1",
+        "vitest": "5.0.3"
     }
 }

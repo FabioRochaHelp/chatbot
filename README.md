@@ -25,10 +25,31 @@ docker compose up -d --build
 - Variáveis do `.env`:
   - `ENGINE=WPPCONNECT` (padrão) ou `ENGINE=VENOM`. Obs.: o venom-bot não tem releases desde 11/2024 e, em testes de 10/2026, abre o WhatsApp Web mas não gera o QR code. Prefira o WPPCONNECT.
   - `API_TOKEN=<segredo>`: protege todas as rotas (exceto `/`). Envie `Authorization: Bearer <segredo>` ou `?token=<segredo>`.
+  - `LOG_LEVEL` (padrão `info`): os logs saem em JSON (pino). Em terminal de desenvolvimento saem formatados.
+  - `CORS_ORIGINS`: origens liberadas, separadas por vírgula (vazio libera qualquer origem).
+  - `RATE_LIMIT_PER_MINUTE` (padrão `600` por IP, `0` desativa) e `TRUST_PROXY=1` quando estiver atrás de nginx/traefik.
 - Desenvolvimento com hot-reload (código montado no container): `docker compose --profile dev up --build myzap-dev`
 - Logs: `docker compose logs -f myzap`
 
 > O endpoint `POST /exec`, que executava comandos de shell no servidor, foi removido por segurança.
+
+> Os parâmetros são validados. Uma requisição inválida (sessão sem `sessionName`, nome com `/` ou `..`, número que não é telefone, URL inválida) responde **HTTP 400** com `{ "result": "error", "message": "INVALID_PARAMS", "errors": [...] }`. O `number` aceita máscara (`+55 (63) 3414-0378`) ou o id completo (`...@c.us`, `...@g.us`).
+
+## Desenvolvimento
+
+```
+server/
+  index.js          bootstrap (http/https, shutdown)
+  app.js            createApp(): Express sem listen (usado nos testes)
+  http.js           segurança (helmet, cors, rate limit), auth, validação, erros
+  schemas.js        schemas zod das rotas
+  routes/legacy.js  rotas da API
+  sessions.js       ciclo de vida das sessões do WhatsApp
+  engine/           adapters wppconnect / venom
+test/               testes (vitest + supertest, sem navegador)
+```
+
+- `npm test` · `npm run lint` · `npm run format` · `npm run check` (tudo o que o CI roda)
 
 ## Setup manual (sem Docker)
 
