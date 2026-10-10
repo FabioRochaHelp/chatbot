@@ -1,13 +1,17 @@
 'use strict';
 
 // DEPRECATED: o venom-bot não tem releases desde 11/2024 e não gera mais o QR code
+const path = require('path');
 const config = require('../config');
 const BROWSER_ARGS = require('./browser-args');
+const { clearStaleProfileLock } = require('./profile-lock');
 
 module.exports = {
     name: 'VENOM',
 
     async create(session, options, puppeteerOptions) {
+        // o venom usa <folderNameToken>/<sessão> como perfil do navegador
+        clearStaleProfileLock(path.join(options.folderNameToken, session.name));
         return require('venom-bot').create({
             ...options,
             headless: 'new',

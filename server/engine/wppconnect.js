@@ -3,6 +3,7 @@
 const path = require('path');
 const config = require('../config');
 const BROWSER_ARGS = require('./browser-args');
+const { clearStaleProfileLock } = require('./profile-lock');
 
 // a lib só é carregada quando uma sessão é criada (cada engine puxa o seu puppeteer)
 const lib = () => require('@wppconnect-team/wppconnect');
@@ -17,6 +18,8 @@ module.exports = {
     async create(session, options, puppeteerOptions) {
         // mesmo launcher do wppconnect (puppeteer-extra + stealth), chamado aqui para guardar o browser
         const { initBrowser } = require('@wppconnect-team/wppconnect/dist/controllers/browser');
+        const userDataDir = path.join(config.tokensDir, session.name);
+        clearStaleProfileLock(userDataDir);
         session.browser = await initBrowser(
             session.name,
             {
@@ -26,7 +29,7 @@ module.exports = {
                 browserArgs: BROWSER_ARGS,
                 puppeteerOptions: {
                     executablePath: config.chromePath,
-                    userDataDir: path.join(config.tokensDir, session.name),
+                    userDataDir,
                     ...puppeteerOptions
                 }
             },

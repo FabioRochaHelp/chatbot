@@ -80,7 +80,7 @@ describe('grupos', () => {
             getProfilePicFromServer: async () => ({}),
             getChatById: async () => ({ name: 'Equipe Vendas' })
         });
-        group = await avatars.refresh('s1', group, client);
+        group = (await avatars.refresh('s1', group, client)).contact;
         expect(group.pushName).toBe('Equipe Vendas');
     });
 
@@ -120,7 +120,7 @@ describe('foto do contato', () => {
     it('baixa, guarda e serve a foto; some quando o contato a esconde', async () => {
         const getProfilePicFromServer = vi.fn(async () => ({ imgFull: 'https://pps.whatsapp.net/foto.jpg' }));
         const { client, contact } = await contactWith({ getProfilePicFromServer });
-        const updated = await avatars.refresh('s1', contact, client, { fetch: fetchOk });
+        const { contact: updated } = await avatars.refresh('s1', contact, client, { fetch: fetchOk });
         expect(getProfilePicFromServer).toHaveBeenCalledWith('556334140378@c.us');
         expect(updated.avatarPath).toMatch(/^avatars\/s1\/\d+\.jpg$/);
         expect(updated.avatarCheckedAt).not.toBeNull();
@@ -132,20 +132,82 @@ describe('foto do contato', () => {
         expect(res.body.toString()).toBe('foto-de-perfil');
 
         client.getProfilePicFromServer = vi.fn(async () => ({}));
-        const hidden = await avatars.refresh('s1', updated, client, { fetch: fetchOk });
+        const { contact: hidden } = await avatars.refresh('s1', updated, client, { fetch: fetchOk });
         expect(hidden.avatarPath).toBeNull();
         expect((await request(app).get(`/api/v1/contacts/${contact.id}/avatar`)).status).toBe(404);
     });
 
-    it('falha no download não quebra e marca a tentativa', async () => {
+    it('falha no download devolve o motivo e tenta de novo em 1 hora (não em 24)', async () => {
         const { client, contact } = await contactWith({
             getProfilePicFromServer: async () => ({ imgFull: 'https://x/y.jpg' })
         });
         const failing = vi.fn(async () => ({ ok: false, status: 403 }));
-        expect(await avatars.refresh('s1', contact, client, { fetch: failing })).toBeNull();
+        const result = await avatars.refresh('s1', contact, client, { fetch: failing });
+        expect(result.error).toBe('download da foto: HTTP 403');
         const after = await db().contact.findUnique({ where: { id: contact.id } });
-        expect(after.avatarCheckedAt).not.toBeNull();
         expect(after.avatarPath).toBeNull();
+        // agora não insiste...
+        expect(avatars.isStale(after)).toBe(false);
+        // ...mas daqui a pouco mais de 1 hora, sim
+        const inOneHour = new Date(after.avatarCheckedAt.getTime() - avatars.RETRY_MS - 1000);
+        expect(avatars.isStale({ avatarCheckedAt: inOneHour })).toBe(true);
+    });
+
+    it('erro ao consultar o WhatsApp não é tratado como "sem foto"', async () => {
+        const { client, contact } = await contactWith({
+            getProfilePicFromServer: async () => {
+                throw new Error('Execution context was destroyed');
+            }
+        });
+        await db().contact.update({ where: { id: contact.id }, data: { avatarPath: 'avatars/s1/antiga.jpg' } });
+        const result = await avatars.refresh('s1', { ...contact, avatarPath: 'avatars/s1/antiga.jpg' }, client, {
+            fetch: fetchOk
+        });
+        expect(result.error).toMatch(/Execution context/);
+        // a foto que já existia continua
+        expect((await db().contact.findUnique({ where: { id: contact.id } })).avatarPath).toBe('avatars/s1/antiga.jpg');
+    });
+
+    it('busca em lote: contatos com conversa recente, sem repetir os já consultados', async () => {
+        await db().session.create({ data: { name: 's1', engine: 'WPPCONNECT' } });
+        for (const number of ['5511900000001', '5511900000002', '5511900000003']) {
+            await history.recordIncoming('s1', incoming({ from: number + '@c.us' }), null);
+        }
+        await db().contact.updateMany({ where: { waId: '5511900000003@c.us' }, data: { avatarCheckedAt: new Date() } });
+        vi.stubGlobal('fetch', fetchOk);
+        const getProfilePicFromServer = vi.fn(async () => ({ imgFull: 'https://pps.whatsapp.net/f.jpg' }));
+        const client = fakeClient({ getProfilePicFromServer });
+
+        expect(await avatars.sweep('s1', client, { gapMs: 0 })).toBe(2);
+        await vi.waitFor(async () =>
+            expect(await db().contact.count({ where: { avatarPath: { not: null } } })).toBe(2)
+        );
+        expect(getProfilePicFromServer).toHaveBeenCalledTimes(2);
+        // force: consulta todos de novo
+        await vi.waitFor(async () => expect(await avatars.sweep('s1', client, { force: true, gapMs: 0 })).toBe(3));
+    });
+
+    it('rotas: atualizar foto do contato devolve o motivo; buscar fotos da sessão', async () => {
+        vi.spyOn(Sessions, 'launch').mockImplementation(() => undefined);
+        const app = createApp({ sessions: Sessions });
+        const admin = request.agent(app);
+        await admin.post('/api/v1/auth/setup').send({ email: 'a@x.com', name: 'A', password: 'senha-forte-1' });
+        const { contact } = await contactWith({
+            getProfilePicFromServer: async () => ({ imgFull: 'https://x/y.jpg' })
+        });
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => ({ ok: false, status: 404 }))
+        );
+        const failed = await admin.post(`/api/v1/contacts/${contact.id}/avatar/refresh`);
+        expect(failed.status).toBe(502);
+        expect(failed.body.error.message).toBe('não foi possível buscar a foto: download da foto: HTTP 404');
+
+        vi.stubGlobal('fetch', fetchOk);
+        const ok = await admin.post(`/api/v1/contacts/${contact.id}/avatar/refresh`);
+        expect(ok.body.data.avatarPath).not.toBeNull();
+        const swept = await admin.post('/api/v1/sessions/s1/avatars/refresh');
+        expect(swept.body.data).toEqual({ queued: 1 });
     });
 
     it('mensagem recebida busca a foto em segundo plano, no máximo uma vez por dia', async () => {

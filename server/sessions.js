@@ -7,6 +7,7 @@ const store = require('./store');
 const history = require('./history');
 const messaging = require('./messaging');
 const pipeline = require('./pipeline');
+const avatars = require('./avatars');
 const events = require('./events');
 const { AppError } = require('./errors');
 const log = require('./logger');
@@ -15,6 +16,8 @@ const log = require('./logger');
 // (o puppeteer continua matando o navegador no evento 'exit' do processo)
 const PUPPETEER_SIGNALS = { handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false };
 const CLOSE_TIMEOUT = 5000;
+// espera depois de conectar antes de buscar as fotos dos contatos
+const AVATAR_SWEEP_DELAY_MS = 10000;
 // intervalo entre as sessões restauradas no boot (cada uma abre um Chromium)
 const RESTORE_INTERVAL = 1500;
 
@@ -142,11 +145,21 @@ module.exports = class Sessions {
             return; // já tratado em launch()
         }
 
+        // fotos dos contatos com conversa recente (espera o WhatsApp Web terminar de carregar)
+        const sweepAvatars = () =>
+            setTimeout(() => {
+                if (session.generation === generation && session.state === 'CONNECTED') {
+                    avatars.sweep(sessionName, client).catch(error => log.warn({ err: error }, 'busca de fotos'));
+                }
+            }, AVATAR_SWEEP_DELAY_MS).unref();
+        sweepAvatars();
+
         client.onStateChange(state => {
             if (session.generation !== generation) return;
             session.state = state;
             store.setLastState(sessionName, state);
             events.emit('session.state', { session: sessionName, state });
+            if (state === 'CONNECTED') sweepAvatars();
             log.info({ session: sessionName, state: state }, 'onStateChange');
         });
         // onAnyMessage também traz o que foi enviado pelo celular (fromMe)
