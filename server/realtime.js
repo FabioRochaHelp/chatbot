@@ -50,6 +50,7 @@ function attach(httpServer, { Sessions }) {
 
     const listeners = {
         'session.state': payload => io.to('all').emit('session.state', payload),
+        'session.deleted': payload => io.to('all').emit('session.deleted', payload),
         'session.qrcode': payload => io.to('managers').emit('session.qrcode', payload),
         'message.saved': payload => io.to('all').emit('message.saved', payload),
         'message.updated': payload => io.to('all').emit('message.updated', payload),

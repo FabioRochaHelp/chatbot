@@ -72,6 +72,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             sessions.forEach(item => setState({ session: item.name, state: item.state }))
         );
         socket.on('session.state', setState);
+        socket.on('session.deleted', ({ session }: { session: string }) => {
+            queryClient.removeQueries({ queryKey: ['sessions', session] });
+            queryClient.invalidateQueries({ queryKey: ['sessions'], exact: true });
+            refreshLists();
+            refreshStats();
+        });
         socket.on('session.qrcode', ({ session, qrcode }: { session: string; qrcode: string }) => {
             setQrcodes(current => ({ ...current, [session]: qrcode }));
             setState({ session, state: 'QRCODE' });

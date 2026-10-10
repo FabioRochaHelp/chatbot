@@ -63,7 +63,7 @@ Dados ficam em dois volumes (os nomes vêm de quando o projeto se chamava MyZap 
 |---|---|---|
 | Painel | Sessões conectadas, fila, conversas em atendimento, não lidas e mensagens dos últimos 7 dias. | Todos |
 | Atendimento | Filas *Fila*, *Minhas*, *Abertas* e *Encerradas*. Assumir, transferir, devolver à fila ou ao bot, encerrar e reabrir. Notas internas, `/atalho` para respostas rápidas, anexos, etiquetas e notificação do navegador. | Todos |
-| Sessões | Criar, conectar pelo QR code (atualiza ao vivo), reconectar, fechar e escolher o bot. Atendentes só consultam. | Todos |
+| Sessões | Criar, conectar pelo QR code (atualiza ao vivo), reconectar, fechar, escolher o bot e excluir. Atendentes só consultam. | Todos |
 | Fluxos | Editor visual, simulador com o rascunho, validação e publicação por versões. | Administradores |
 | Assistentes de IA | Instruções, base de conhecimento, modelo, estilo de resposta, limites, playground e custo dos últimos 30 dias. | Administradores |
 | Enviar mensagem | Teste de envio pela API com o `curl` equivalente. | Administradores |
@@ -105,6 +105,8 @@ curl -X POST http://localhost:3333/api/v1/sessions/loja/messages \
   -H "Authorization: Bearer $CONECTZAP_API_KEY" -H "Content-Type: application/json" \
   -d '{"to": "5511999999999", "type": "text", "text": "Olá!"}'
 ```
+
+**Excluir uma sessão** (`DELETE /api/v1/sessions/{nome}` ou *Sessões → sessão → Excluir sessão*) desconecta o aparelho no WhatsApp, apaga o login e todas as conversas, contatos, mensagens, mídias e webhooks da sessão. Fluxos e assistentes de IA continuam. Não dá para desfazer: faça um backup antes se quiser guardar o histórico.
 
 Tipos de mensagem: `text`, `file` (`base64` + `fileName`), `voice`, `location` (`lat`, `lng`), `link` e `contact`. O destino aceita número com DDI (com ou sem máscara) ou o id do WhatsApp (`...@c.us`, `...@g.us`).
 

@@ -211,7 +211,13 @@ const worker = {
     }
 };
 
+/** Esquece o id em cache (sessão excluída; outra pode ser criada com o mesmo nome). */
+function forgetSession(name) {
+    sessionIds.delete(name);
+}
+
 module.exports = {
+    forgetSession,
     EVENTS,
     MAX_ATTEMPTS,
     BACKOFF_SECONDS,

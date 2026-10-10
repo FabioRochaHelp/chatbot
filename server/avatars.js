@@ -20,7 +20,8 @@ const SWEEP_LIMIT = 300;
 const SWEEP_GAP_MS = 1500;
 
 const running = new Set();
-const sweeping = new Set();
+// buscas em lote em andamento, por sessão
+const sweeps = new Map();
 
 function isStale(contact) {
     return !contact.avatarCheckedAt || Date.now() - new Date(contact.avatarCheckedAt).getTime() > REFRESH_MS;
@@ -92,7 +93,7 @@ function refreshIfStale(sessionName, contact, client) {
  * Uma busca por sessão de cada vez. Devolve quantos contatos entraram na fila.
  */
 async function sweep(sessionName, client, { force = false, gapMs = SWEEP_GAP_MS } = {}) {
-    if (!client || sweeping.has(sessionName)) return 0;
+    if (!client || sweeps.has(sessionName)) return 0;
     const session = await db().session.findUnique({ where: { name: sessionName }, select: { id: true } });
     if (!session) return 0;
     const since = new Date(Date.now() - SWEEP_DAYS * 86400000);
@@ -108,8 +109,7 @@ async function sweep(sessionName, client, { force = false, gapMs = SWEEP_GAP_MS 
         take: SWEEP_LIMIT
     });
     if (!contacts.length) return 0;
-    sweeping.add(sessionName);
-    (async () => {
+    const job = (async () => {
         let saved = 0;
         let failed = 0;
         for (const [index, contact] of contacts.entries()) {
@@ -124,8 +124,12 @@ async function sweep(sessionName, client, { force = false, gapMs = SWEEP_GAP_MS 
         );
     })()
         .catch(error => log.warn({ err: error, session: sessionName }, 'falha na busca de fotos'))
-        .finally(() => sweeping.delete(sessionName));
+        .finally(() => sweeps.delete(sessionName));
+    sweeps.set(sessionName, job);
     return contacts.length;
 }
 
-module.exports = { refresh, refreshIfStale, sweep, isStale, REFRESH_MS, RETRY_MS };
+/** Espera as buscas em lote em andamento terminarem (testes, desligamento). */
+const idle = () => Promise.all([...sweeps.values()]);
+
+module.exports = { refresh, refreshIfStale, sweep, idle, isStale, REFRESH_MS, RETRY_MS };
