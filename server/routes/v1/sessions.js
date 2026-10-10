@@ -2,6 +2,7 @@
 
 const { db } = require('../../db');
 const messaging = require('../../messaging');
+const avatars = require('../../avatars');
 const { AppError } = require('../../errors');
 const schemas = require('./schemas');
 const { ROLES } = require('./router');
@@ -205,6 +206,23 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
             body: schemas.sendMessage
         },
         ({ params, body }) => messaging.send(Sessions, params.name, body, { origin: 'api' })
+    );
+
+    define(
+        {
+            method: 'post',
+            path: '/sessions/:name/avatars/refresh',
+            roles: manage,
+            tags,
+            summary: 'Busca agora as fotos dos contatos com conversa nos últimos 30 dias',
+            description:
+                'Roda em segundo plano, um contato por vez. As fotos já são buscadas sozinhas ao conectar e quando o contato manda mensagem.',
+            params: schemas.sessionParams
+        },
+        async ({ params }) => {
+            const client = await messaging.connectedClient(Sessions, params.name);
+            return { queued: await avatars.sweep(params.name, client, { force: true }) };
+        }
     );
 
     define(

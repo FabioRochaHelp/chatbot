@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, LoaderCircle, Power, Send } from 'lucide-react';
+import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, LoaderCircle, Power, RefreshCw, Send } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { SessionStateBadge } from '@/components/session-state';
 import { Button } from '@/components/ui/button';
@@ -244,6 +244,16 @@ function Settings({ session }: { session: Session }) {
     );
     const close = useSessionMutation(session.name, name => api.post<Session>(path(name) + '/close'));
     const queryClient = useQueryClient();
+    const photos = useMutation({
+        mutationFn: () => api.post<{ queued: number }>(path(session.name) + '/avatars/refresh'),
+        onSuccess: ({ queued }) =>
+            toast.success(
+                queued
+                    ? `Buscando as fotos de ${queued} contatos em segundo plano`
+                    : 'Nenhum contato com conversa nos últimos 30 dias'
+            ),
+        onError: error => toast.error(error instanceof ApiError ? error.message : 'Não foi possível buscar as fotos.')
+    });
     const groups = useMutation({
         mutationFn: (acceptGroups: boolean) => api.patch<Session>(path(session.name), { acceptGroups }),
         onSuccess: updated => {
@@ -292,6 +302,25 @@ function Settings({ session }: { session: Session }) {
                         aria-label="Grupos no Atendimento"
                     />
                 </label>
+                {canManage && (
+                    <div className="grid gap-1">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="justify-self-start"
+                            disabled={session.state !== 'CONNECTED'}
+                            loading={photos.isPending}
+                            onClick={() => photos.mutate()}
+                        >
+                            {!photos.isPending && <RefreshCw />} Atualizar fotos dos contatos
+                        </Button>
+                        <span className="text-[13px] text-muted-foreground">
+                            {session.state === 'CONNECTED'
+                                ? 'As fotos já são buscadas sozinhas ao conectar e quando o contato escreve.'
+                                : 'Disponível com a sessão conectada.'}
+                        </span>
+                    </div>
+                )}
                 <dl className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                         <dt className="text-[13px] text-muted-foreground">Motor</dt>

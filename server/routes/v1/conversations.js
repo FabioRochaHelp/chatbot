@@ -326,7 +326,8 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             });
             if (!contact) throw new AppError(404, 'CONTACT_NOT_FOUND', 'contato não encontrado');
             const client = await messaging.connectedClient(Sessions, contact.session.name);
-            await avatars.refresh(contact.session.name, contact, client);
+            const { error } = await avatars.refresh(contact.session.name, contact, client);
+            if (error) throw new AppError(502, 'AVATAR_FAILED', 'não foi possível buscar a foto: ' + error);
             return findContact(params.id);
         }
     );

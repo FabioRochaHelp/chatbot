@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { X } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -26,6 +26,16 @@ export function ContactPanel({ conversation, onClose }: { conversation: Conversa
             queryClient.invalidateQueries({ queryKey: ['conversations'] });
         },
         onError: error => toast.error(error instanceof ApiError ? error.message : 'Não foi possível salvar.')
+    });
+
+    const refreshPhoto = useMutation({
+        mutationFn: () => api.post<Contact>(`/contacts/${contact.id}/avatar/refresh`),
+        onSuccess: updated => {
+            queryClient.invalidateQueries({ queryKey: ['conversation', conversation.id] });
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            toast.success(updated.avatarPath ? 'Foto atualizada' : 'O contato não tem foto pública');
+        },
+        onError: error => toast.error(error instanceof ApiError ? error.message : 'Não foi possível buscar a foto.')
     });
 
     const addTag = (event: FormEvent) => {
@@ -67,6 +77,15 @@ export function ContactPanel({ conversation, onClose }: { conversation: Conversa
                         src={avatarUrl(contact)}
                         className="size-16 text-lg"
                     />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground"
+                        loading={refreshPhoto.isPending}
+                        onClick={() => refreshPhoto.mutate()}
+                    >
+                        {!refreshPhoto.isPending && <RefreshCw />} Atualizar foto
+                    </Button>
                     <p className="font-medium">{contactName(contact)}</p>
                     {contact.pushName && contact.name && (
                         <p className="-mt-1.5 text-xs text-muted-foreground">No WhatsApp: {contact.pushName}</p>
