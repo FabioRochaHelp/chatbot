@@ -6,6 +6,7 @@ const { z } = require('zod');
 const { db } = require('../../db');
 const messaging = require('../../messaging');
 const history = require('../../history');
+const avatars = require('../../avatars');
 const events = require('../../events');
 const { AppError } = require('../../errors');
 const { pagination } = require('./router');
@@ -287,6 +288,46 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             const contact = await db().contact.update({ where: { id: params.id }, data: body });
             events.emit('contact.updated', { contact });
             return contact;
+        }
+    );
+
+    define(
+        {
+            method: 'get',
+            path: '/contacts/:id/avatar',
+            tags: ['Contatos'],
+            summary: 'Foto de perfil do contato (404 se não houver)',
+            params: schemas.idParams
+        },
+        async ({ params }, req, res) => {
+            const contact = await findContact(params.id);
+            const file = history.mediaAbsolutePath(contact.avatarPath);
+            if (!file || !fs.existsSync(file)) throw new AppError(404, 'AVATAR_NOT_FOUND', 'contato sem foto');
+            // a URL leva ?v=<data da consulta>; dá para guardar em cache sem medo de foto velha
+            res.setHeader('Cache-Control', 'private, max-age=86400');
+            res.type('jpg');
+            await new Promise((resolve, reject) => res.sendFile(file, error => (error ? reject(error) : resolve())));
+        }
+    );
+
+    define(
+        {
+            method: 'post',
+            path: '/contacts/:id/avatar/refresh',
+            tags: ['Contatos'],
+            summary: 'Busca de novo a foto de perfil no WhatsApp',
+            description: 'A foto já é atualizada sozinha (no máximo uma vez por dia) quando o contato manda mensagem.',
+            params: schemas.idParams
+        },
+        async ({ params }) => {
+            const contact = await db().contact.findUnique({
+                where: { id: params.id },
+                include: { session: { select: { name: true } } }
+            });
+            if (!contact) throw new AppError(404, 'CONTACT_NOT_FOUND', 'contato não encontrado');
+            const client = await messaging.connectedClient(Sessions, contact.session.name);
+            await avatars.refresh(contact.session.name, contact, client);
+            return findContact(params.id);
         }
     );
 

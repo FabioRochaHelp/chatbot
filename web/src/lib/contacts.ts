@@ -1,6 +1,12 @@
 import type { Contact, Conversation, ConversationStatus, Message } from './types';
 import { formatWaId } from './utils';
 
+/** URL da foto guardada; ?v muda quando a foto é consultada de novo (fura o cache). */
+export const avatarUrl = (contact: Contact) =>
+    contact.avatarPath
+        ? `/api/v1/contacts/${contact.id}/avatar?v=${Date.parse(contact.avatarCheckedAt ?? '') || 0}`
+        : null;
+
 export const contactName = (contact: Contact) => contact.name || contact.pushName || formatWaId(contact.waId);
 
 export function initials(name: string) {

@@ -24,6 +24,7 @@ export type Session = {
     botMode: string;
     flow: { id: number; name: string; version: number } | null;
     aiAgent: { id: number; name: string; model: string } | null;
+    acceptGroups: boolean;
     hasQrcode: boolean;
     createdAt: string | null;
     updatedAt: string | null;
@@ -56,6 +57,8 @@ export type Message = {
         url?: string;
         vcard?: string;
         contact?: string;
+        // grupos: nome de quem escreveu
+        authorName?: string;
     } | null;
     sentBy: { id: number; name: string } | null;
     timestamp: string;
@@ -68,6 +71,8 @@ export type Contact = {
     pushName: string | null;
     isGroup: boolean;
     tags: string[];
+    avatarPath: string | null;
+    avatarCheckedAt: string | null;
     createdAt: string;
 };
 

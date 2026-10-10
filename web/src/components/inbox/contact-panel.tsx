@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { api, ApiError } from '@/lib/api';
-import { contactName, STATUS_LABEL } from '@/lib/contacts';
+import { avatarUrl, contactName, STATUS_LABEL } from '@/lib/contacts';
 import type { Contact, Conversation } from '@/lib/types';
 import { formatWaId } from '@/lib/utils';
 
@@ -37,7 +37,7 @@ export function ContactPanel({ conversation, onClose }: { conversation: Conversa
     };
 
     const rows: [string, string][] = [
-        ['Número', formatWaId(contact.waId)],
+        ...(contact.isGroup ? [] : ([['Número', formatWaId(contact.waId)]] as [string, string][])),
         ['Sessão', conversation.session],
         [
             'Situação',
@@ -61,7 +61,12 @@ export function ContactPanel({ conversation, onClose }: { conversation: Conversa
             </div>
             <div className="grid gap-5 p-4">
                 <div className="flex flex-col items-center gap-2 text-center">
-                    <Avatar name={contactName(contact)} group={contact.isGroup} className="size-16 text-lg" />
+                    <Avatar
+                        name={contactName(contact)}
+                        group={contact.isGroup}
+                        src={avatarUrl(contact)}
+                        className="size-16 text-lg"
+                    />
                     <p className="font-medium">{contactName(contact)}</p>
                     {contact.pushName && contact.name && (
                         <p className="-mt-1.5 text-xs text-muted-foreground">No WhatsApp: {contact.pushName}</p>

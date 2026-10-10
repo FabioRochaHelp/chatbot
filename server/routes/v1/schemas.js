@@ -42,7 +42,11 @@ module.exports = {
             .positive()
             .nullable()
             .optional()
-            .describe('assistente de IA usado quando botMode = ai')
+            .describe('assistente de IA usado quando botMode = ai'),
+        acceptGroups: z
+            .boolean()
+            .optional()
+            .describe('mostrar grupos no Atendimento (o bot nunca atende grupos); false ignora mensagens de grupo')
     }),
     qrcodeQuery: z.object({ format: z.enum(['json', 'png']).default('json') }),
     status: z.enum(statuses),

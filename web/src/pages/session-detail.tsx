@@ -243,6 +243,20 @@ function Settings({ session }: { session: Session }) {
         api.patch<Session>(path(name), { autoStart: !session.autoStart })
     );
     const close = useSessionMutation(session.name, name => api.post<Session>(path(name) + '/close'));
+    const queryClient = useQueryClient();
+    const groups = useMutation({
+        mutationFn: (acceptGroups: boolean) => api.patch<Session>(path(session.name), { acceptGroups }),
+        onSuccess: updated => {
+            queryClient.setQueryData(['sessions', session.name], updated);
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            toast.success(
+                updated.acceptGroups
+                    ? 'Grupos no Atendimento ligados'
+                    : 'Grupos desligados: as conversas de grupo abertas foram encerradas'
+            );
+        },
+        onError: error => toast.error(error instanceof ApiError ? error.message : 'Não foi possível alterar.')
+    });
 
     return (
         <Card>
@@ -260,6 +274,22 @@ function Settings({ session }: { session: Session }) {
                         disabled={!canManage || patch.isPending || session.autoStart === null}
                         onCheckedChange={() => patch.mutate()}
                         aria-label="Reconectar automaticamente"
+                    />
+                </label>
+                <label className="flex items-start justify-between gap-4">
+                    <span>
+                        <span className="block text-sm font-medium">Grupos no Atendimento</span>
+                        <span className="block text-[13px] text-muted-foreground">
+                            {session.acceptGroups
+                                ? 'Mensagens de grupos entram na fila para um atendente. O bot nunca responde grupos.'
+                                : 'Mensagens de grupos são ignoradas. O bot nunca responde grupos.'}
+                        </span>
+                    </span>
+                    <Switch
+                        checked={session.acceptGroups}
+                        disabled={!canManage || groups.isPending || session.autoStart === null}
+                        onCheckedChange={acceptGroups => groups.mutate(acceptGroups)}
+                        aria-label="Grupos no Atendimento"
                     />
                 </label>
                 <dl className="grid grid-cols-2 gap-3 text-sm">

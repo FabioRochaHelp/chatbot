@@ -104,6 +104,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             refreshLists();
             refreshStats();
         });
+        // várias conversas mudaram de uma vez (bot desligado, grupos desligados)
+        socket.on('conversations.changed', () => {
+            refreshLists();
+            refreshStats();
+        });
         socket.on('contact.updated', () => {
             refreshLists();
             queryClient.invalidateQueries({ queryKey: ['conversation'] });
