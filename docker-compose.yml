@@ -1,10 +1,10 @@
 services:
-  myzap:
+  conectzap:
     build:
       context: .
       target: prod
-    image: myzap:latest
-    container_name: myzap
+    image: conectzap:latest
+    container_name: conectzap
     env_file:
       - path: .env
         required: false
@@ -14,20 +14,21 @@ services:
       - "${PORT:-3333}:3333"
     volumes:
       - myzap_tokens:/usr/src/app/tokens
+      - myzap_data:/usr/src/app/data
     shm_size: 1gb
     restart: unless-stopped
     stop_grace_period: 30s
     networks:
       backend:
         aliases:
-          - myzap
+          - conectzap
 
-  myzap-dev:
+  conectzap-dev:
     profiles: [dev]
     build:
       context: .
       target: dev
-    container_name: myzap-dev
+    container_name: conectzap-dev
     env_file:
       - path: .env
         required: false
@@ -44,11 +45,14 @@ services:
     networks:
       backend:
         aliases:
-          - myzap-dev
+          - conectzap-dev
 
+# os volumes mantêm o nome de quando o app se chamava MyZap:
+# renomear criaria volumes vazios (perderia o login do WhatsApp e o banco)
 volumes:
   myzap_tokens:
+  myzap_data:
 
 networks:
   backend:
-    name: myzapnetwork
+    name: conectzapnetwork

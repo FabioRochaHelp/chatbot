@@ -1,2 +1,2 @@
 #!/bin/bash
-docker compose exec myzap bash
+docker compose exec conectzap bash

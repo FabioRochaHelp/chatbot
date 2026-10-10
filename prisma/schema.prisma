@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Session {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  engine        String
+  // reinicia a sessão quando o servidor sobe; /close desliga
+  autoStart     Boolean        @default(true)
+  // off | flow | ai | flow+ai (usado pelo pipeline do chatbot)
+  botMode       String         @default("off")
+  // fluxo usado quando botMode inclui "flow"
+  flowId        Int?
+  flow          Flow?          @relation(fields: [flowId], references: [id], onDelete: SetNull)
+  // assistente usado quando botMode = "ai"
+  aiAgentId     Int?
+  aiAgent       AiAgent?       @relation(fields: [aiAgentId], references: [id], onDelete: SetNull)
+  lastState     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  webhooks      Webhook[]
+  contacts      Contact[]
+  conversations Conversation[]
+  messages      Message[]
+}
+
+model Webhook {
+  id         Int               @id @default(autoincrement())
+  // null = todas as sessões
+  sessionId  Int?
+  session    Session?          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  url        String
+  // segredo da assinatura HMAC (X-ConectZap-Signature); webhooks antigos não assinam
+  secret     String?
+  // eventos assinados, ex.: ["message.received", "conversation.handoff"]
+  events     Json              @default("[\"message.received\"]")
+  active     Boolean           @default(true)
+  // criado pela rota antiga /sendHook (um por sessão, formato antigo)
+  legacy     Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  deliveries WebhookDelivery[]
+
+  @@index([sessionId])
+}
+
+model WebhookDelivery {
+  id            Int       @id @default(autoincrement())
+  webhookId     Int
+  webhook       Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event         String
+  payload       Json
+  // pending | success | failed
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastStatus    Int?
+  lastError     String?
+  durationMs    Int?
+  createdAt     DateTime  @default(now())
+  deliveredAt   DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, id])
+  @@index([createdAt])
+}
+
+model Contact {
+  id            Int            @id @default(autoincrement())
+  sessionId     Int
+  session       Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  // id no WhatsApp: 5511999999999@c.us ou ...@g.us
+  waId          String
+  // nome definido no painel; pushName é o que o próprio contato configurou
+  name          String?
+  pushName      String?
+  isGroup       Boolean        @default(false)
+  tags          Json           @default("[]")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+
+  @@unique([sessionId, waId])
+}
+
+model Conversation {
+  id             Int       @id @default(autoincrement())
+  sessionId      Int
+  session        Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  contactId      Int
+  contact        Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  // bot | pending (aguardando atendente) | open (com atendente) | closed
+  status         String    @default("bot")
+  assignedUserId Int?
+  assignedUser   User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  // estado do motor de fluxos (nó atual, variáveis)
+  flowState      Json?
+  unreadCount    Int       @default(0)
+  lastMessageAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  closedAt       DateTime?
+  messages       Message[]
+
+  @@index([sessionId, status, lastMessageAt])
+  @@index([contactId, status])
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  sessionId      Int
+  session        Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  conversationId Int
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  waMessageId    String?
+  // in (recebida) | out (enviada) | note (nota interna, não vai para o WhatsApp)
+  direction      String
+  // contact | phone (enviada pelo celular) | api | bot | agent
+  origin         String
+  // chat, image, video, audio, ptt, document, sticker, location, vcard, link...
+  type           String
+  body           String?
+  caption        String?
+  // participante que enviou (mensagens de grupo)
+  author         String?
+  mediaPath      String?
+  mimeType       String?
+  fileName       String?
+  // dados extras por tipo (localização, vcard, link)
+  payload        Json?
+  sentByUserId   Int?
+  sentBy         User?        @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
+  timestamp      DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  @@unique([sessionId, waMessageId])
+  @@index([conversationId, id])
+  @@index([timestamp])
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  name          String
+  // scrypt$N$r$p$salt$hash
+  passwordHash  String
+  // admin | agent
+  role          String         @default("agent")
+  active        Boolean        @default(true)
+  // incrementado ao trocar senha/desativar: invalida os logins ativos
+  tokenVersion  Int            @default(0)
+  lastLoginAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  apiKeys       ApiKey[]
+  conversations Conversation[]
+  messages      Message[]
+}
+
+model ApiKey {
+  id          Int       @id @default(autoincrement())
+  name        String
+  // primeiros caracteres, para identificar a chave na listagem
+  prefix      String
+  // sha256 da chave (a chave em si só é mostrada na criação)
+  keyHash     String    @unique
+  createdById Int?
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model QuickReply {
+  id        Int      @id @default(autoincrement())
+  // atalho digitado no chat depois de "/", ex.: "horario"
+  shortcut  String   @unique
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Flow {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  // rascunho editado no painel: { nodes, edges, settings }
+  definition  Json
+  // versão em uso pelas sessões (null = nunca publicado)
+  published   Json?
+  version     Int       @default(0)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sessions    Session[]
+}
+
+model AiAgent {
+  id                Int       @id @default(autoincrement())
+  name              String
+  model             String    @default("claude-opus-5")
+  // low | medium | high (profundidade do raciocínio; chat costuma ir bem em low)
+  effort            String    @default("low")
+  // como o assistente deve se comportar (tom, o que pode ou não fazer)
+  instructions      String    @default("")
+  // fatos da empresa: horários, preços, políticas, perguntas frequentes
+  knowledge         String    @default("")
+  // mensagens anteriores da conversa enviadas como contexto
+  historyMessages   Int       @default(20)
+  // respostas por conversa por hora; acima disso transfere para atendente
+  maxRepliesPerHour Int       @default(20)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  sessions          Session[]
+  usage             AiUsage[]
+}
+
+model AiUsage {
+  id               Int      @id @default(autoincrement())
+  agentId          Int?
+  agent            AiAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  conversationId   Int?
+  model            String
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  // reply | handoff | end | error | refusal | limit
+  outcome          String
+  // teste no painel (playground) não entra nos limites
+  test             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([conversationId, createdAt])
+}
