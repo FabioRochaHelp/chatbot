@@ -16,6 +16,7 @@ const log = require('./logger');
 // (o puppeteer continua matando o navegador no evento 'exit' do processo)
 const PUPPETEER_SIGNALS = { handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false };
 const CLOSE_TIMEOUT = 5000;
+const LOGOUT_TIMEOUT = 10000;
 // espera depois de conectar antes de buscar as fotos dos contatos
 const AVATAR_SWEEP_DELAY_MS = 10000;
 // intervalo entre as sessões restauradas no boot (cada uma abre um Chromium)
@@ -230,6 +231,40 @@ module.exports = class Sessions {
             return { result: 'error', message: 'NOTFOUND' };
         }
     } //close
+
+    /**
+     * Tira a sessão do ar para excluir: desconecta o aparelho no WhatsApp (logout, se estiver conectada),
+     * fecha o navegador e remove da memória. Os dados (banco, arquivos) ficam com quem chamou.
+     * Devolve { loggedOut }.
+     */
+    static async remove(sessionName, { logout = true } = {}) {
+        var session = Sessions.getSession(sessionName);
+        if (!session) return { loggedOut: false };
+        let loggedOut = false;
+        if (logout && session.state === 'CONNECTED' && session.client) {
+            try {
+                const client = await session.client;
+                if (typeof client.logout === 'function') {
+                    await Promise.race([
+                        client.logout(),
+                        new Promise((resolve, reject) =>
+                            setTimeout(() => reject(new Error('tempo esgotado')), LOGOUT_TIMEOUT)
+                        )
+                    ]);
+                    loggedOut = true;
+                }
+            } catch (error) {
+                log.warn(
+                    { session: sessionName, err: error },
+                    'logout no WhatsApp falhou; o aparelho pode continuar em Aparelhos conectados'
+                );
+            }
+        }
+        // shutdown: não grava autoStart/estado (o registro vai ser apagado)
+        await Sessions.closeSession(sessionName, { shutdown: true });
+        Sessions.sessions = Sessions.getSessions().filter(item => item.name !== sessionName);
+        return { loggedOut };
+    } //remove
 
     static getSession(sessionName) {
         var foundSession = false;

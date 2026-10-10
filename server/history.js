@@ -294,7 +294,13 @@ async function addNote(conversation, text, userId) {
     return message;
 }
 
+/** Esquece o id em cache (sessão excluída; outra pode ser criada com o mesmo nome). */
+function forgetSession(name) {
+    sessionIds.delete(name);
+}
+
 module.exports = {
+    forgetSession,
     normalize,
     recordIncoming,
     recordOutgoing,

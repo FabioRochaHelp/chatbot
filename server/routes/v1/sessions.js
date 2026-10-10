@@ -3,6 +3,8 @@
 const { db } = require('../../db');
 const messaging = require('../../messaging');
 const avatars = require('../../avatars');
+const { deleteSessionData } = require('../../session-cleanup');
+const log = require('../../logger');
 const { AppError } = require('../../errors');
 const schemas = require('./schemas');
 const { ROLES } = require('./router');
@@ -206,6 +208,28 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
             body: schemas.sendMessage
         },
         ({ params, body }) => messaging.send(Sessions, params.name, body, { origin: 'api' })
+    );
+
+    define(
+        {
+            method: 'delete',
+            path: '/sessions/:name',
+            roles: manage,
+            tags,
+            summary: 'Exclui a sessão',
+            description:
+                'Desconecta o aparelho no WhatsApp (se conectado), fecha o navegador e apaga o login, as conversas, ' +
+                'contatos, mensagens, mídias e webhooks da sessão. Fluxos e assistentes de IA ficam. Não dá para desfazer.',
+            params: schemas.sessionParams
+        },
+        async ({ params }) => {
+            await find(params.name);
+            const { loggedOut } = await Sessions.remove(params.name);
+            const removed = await deleteSessionData(params.name);
+            events.emit('session.deleted', { session: params.name });
+            log.info({ session: params.name, loggedOut, ...removed }, 'sessão excluída');
+            return { deleted: true, loggedOut, ...removed };
+        }
     );
 
     define(

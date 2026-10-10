@@ -184,7 +184,9 @@ describe('foto do contato', () => {
         );
         expect(getProfilePicFromServer).toHaveBeenCalledTimes(2);
         // force: consulta todos de novo
-        await vi.waitFor(async () => expect(await avatars.sweep('s1', client, { force: true, gapMs: 0 })).toBe(3));
+        await avatars.idle();
+        expect(await avatars.sweep('s1', client, { force: true, gapMs: 0 })).toBe(3);
+        await avatars.idle();
     });
 
     it('rotas: atualizar foto do contato devolve o motivo; buscar fotos da sessão', async () => {

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, LoaderCircle, Power, RefreshCw, Send } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { SessionStateBadge } from '@/components/session-state';
+import { DeleteSession } from '@/components/sessions/delete-session';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -366,6 +367,7 @@ function Settings({ session }: { session: Session }) {
                         </Dialog>
                     </div>
                 )}
+                {canManage && <DeleteSession session={session} />}
             </CardContent>
         </Card>
     );

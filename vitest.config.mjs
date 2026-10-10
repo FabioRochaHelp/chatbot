@@ -6,6 +6,8 @@ import { defineConfig } from 'vitest/config';
 const dataDir = path.join(os.tmpdir(), 'conectzap-test-' + process.pid);
 process.env.DATA_DIR = dataDir;
 process.env.DATABASE_URL = 'file:' + path.join(dataDir, 'test.db');
+// login do WhatsApp dos testes também fica no diretório descartável (nunca no ./tokens real)
+process.env.TOKENS_DIR = path.join(dataDir, 'tokens');
 
 export default defineConfig({
     test: {
