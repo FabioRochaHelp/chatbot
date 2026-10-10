@@ -73,7 +73,9 @@ Dados ficam em dois volumes (os nomes vêm de quando o projeto se chamava MyZap 
 Como as conversas andam:
 
 - Com o bot desligado (padrão), toda conversa nova entra na **Fila**. Com bot ligado, começa **com o bot** e vai para a fila quando o fluxo ou a IA transfere, quando o cliente escreve "atendente"/"humano" (configurável no fluxo) ou se algo der errado.
-- O bot e a IA só respondem conversas *com o bot*. Assumir uma conversa os faz parar. Grupos ficam de fora.
+- O bot e a IA só respondem conversas *com o bot*. Assumir uma conversa os faz parar.
+- **Grupos:** o bot nunca responde grupos. Por padrão as mensagens de grupo são ignoradas (não entram no Atendimento). Para atender grupos com a equipe, ligue *Sessões → sessão → Grupos no Atendimento*; desligar encerra as conversas de grupo abertas (o histórico fica). Canais do WhatsApp são sempre ignorados.
+- **Fotos de perfil:** baixadas quando o contato manda mensagem (no máximo uma vez por dia) e guardadas em `DATA_DIR/media/avatars`, porque os links do WhatsApp expiram. Contatos com foto privada ficam com as iniciais. Em grupos, o nome do grupo também vem do WhatsApp.
 - Responder pelo painel assume a conversa. Responder uma conversa encerrada a reabre.
 
 ### Bot de fluxos

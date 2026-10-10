@@ -135,8 +135,10 @@ export function MessageBubble({ message, isGroup }: { message: Message; isGroup:
                     outgoing ? 'rounded-br-md bg-primary-soft' : 'rounded-bl-md border bg-card'
                 )}
             >
-                {isGroup && !outgoing && message.author && (
-                    <p className="mb-0.5 text-xs font-medium text-info">{formatWaId(message.author)}</p>
+                {isGroup && !outgoing && (message.payload?.authorName || message.author) && (
+                    <p className="mb-0.5 text-xs font-medium text-info">
+                        {message.payload?.authorName ?? formatWaId(message.author!)}
+                    </p>
                 )}
                 {HAS_MEDIA.has(message.type) && (
                     <div className={cn(text && 'mb-1.5')}>

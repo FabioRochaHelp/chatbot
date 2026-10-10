@@ -26,6 +26,7 @@ function view(row, memory) {
         botMode: row ? row.botMode : 'off',
         flow: row && row.flow ? { id: row.flow.id, name: row.flow.name, version: row.flow.version } : null,
         aiAgent: row && row.aiAgent ? row.aiAgent : null,
+        acceptGroups: row ? row.acceptGroups : false,
         hasQrcode: Boolean(memory && memory.state === 'QRCODE' && memory.qrcode),
         createdAt: row ? row.createdAt : null,
         updatedAt: row ? row.updatedAt : null
@@ -113,6 +114,14 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
                 throw new AppError(400, 'AI_AGENT_REQUIRED', 'escolha um assistente de IA para ligar a IA');
             }
             const updated = await db().session.update({ where: { name: params.name }, data: body, include: WITH_FLOW });
+            if (body.acceptGroups === false && row.acceptGroups) {
+                // grupos fora do Atendimento: encerra as conversas de grupo abertas (o histórico fica)
+                const closed = await db().conversation.updateMany({
+                    where: { sessionId: updated.id, status: { not: 'closed' }, contact: { isGroup: true } },
+                    data: { status: 'closed', closedAt: new Date(), flowState: Prisma.DbNull }
+                });
+                if (closed.count) events.emit('conversations.changed', { session: params.name });
+            }
             if (!botActive(updated)) {
                 // bot desligado: quem estava com o bot vai para a fila
                 const moved = await db().conversation.updateMany({

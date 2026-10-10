@@ -8,7 +8,7 @@ import { Input, Select } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { contactName, preview, STATUS_LABEL } from '@/lib/contacts';
+import { avatarUrl, contactName, preview, STATUS_LABEL } from '@/lib/contacts';
 import { notificationsSupported } from '@/lib/notifications';
 import { useSessions } from '@/lib/queries';
 import type { Conversation } from '@/lib/types';
@@ -184,7 +184,11 @@ export function ConversationList({ filter, onFilter }: { filter: Filter; onFilte
                                             )
                                         }
                                     >
-                                        <Avatar name={name} group={conversation.contact.isGroup} />
+                                        <Avatar
+                                            name={name}
+                                            group={conversation.contact.isGroup}
+                                            src={avatarUrl(conversation.contact)}
+                                        />
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-baseline justify-between gap-2">
                                                 <span

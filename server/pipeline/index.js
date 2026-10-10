@@ -167,8 +167,10 @@ function handle(Sessions, sessionName, message) {
         });
         if (!conversation || conversation.status !== 'bot') return null;
         const { session, contact } = conversation;
-        if (!botActive(session) || contact.isGroup) {
-            // bot desligado depois que a conversa começou (ou grupo): a conversa vai para a fila
+        // o bot nunca atende grupos (eles nascem na fila, se a sessão aceitar grupos)
+        if (contact.isGroup) return null;
+        if (!botActive(session)) {
+            // bot desligado depois que a conversa começou: a conversa vai para a fila
             await updateConversation(conversation.id, { status: 'pending', flowState: Prisma.DbNull });
             return null;
         }

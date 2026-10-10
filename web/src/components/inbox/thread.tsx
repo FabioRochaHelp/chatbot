@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
-import { contactName, STATUS_LABEL, statusTone } from '@/lib/contacts';
+import { avatarUrl, contactName, STATUS_LABEL, statusTone } from '@/lib/contacts';
 import { useSessions } from '@/lib/queries';
 import { threadKey, type ThreadPage } from '@/lib/thread';
 import type { Conversation } from '@/lib/types';
@@ -112,7 +112,12 @@ export function Thread({ id, onToggleDetails }: { id: number; onToggleDetails: (
                         <ArrowLeft />
                     </Link>
                 </Button>
-                <Avatar name={name} group={conversation.contact.isGroup} className="size-9" />
+                <Avatar
+                    name={name}
+                    group={conversation.contact.isGroup}
+                    src={avatarUrl(conversation.contact)}
+                    className="size-9"
+                />
                 <div className="min-w-0 flex-1">
                     <h2 className="truncate text-sm font-semibold">{name}</h2>
                     <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">

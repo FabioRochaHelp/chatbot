@@ -24,5 +24,13 @@ module.exports = {
 
     sendVoice: (client, to, base64) => client.sendVoiceBase64(to, base64),
     sendLinkPreview: (client, to, url, caption) => client.sendLinkPreview(to, url, caption || '', ''),
-    getAllChatsNewMsg: client => client.getAllChatsNewMsg()
+    getAllChatsNewMsg: client => client.getAllChatsNewMsg(),
+    getChatName: async (client, chatId) => {
+        const chat = await client.getChatById(chatId);
+        return (chat && (chat.name || chat.formattedTitle)) || null;
+    },
+    getProfilePicUrl: async (client, chatId) => {
+        const url = await client.getProfilePicFromServer(chatId);
+        return typeof url === 'string' && /^https?:/.test(url) ? url : null;
+    }
 };

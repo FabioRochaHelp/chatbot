@@ -6,6 +6,7 @@ const config = require('./config');
 const { db } = require('./db');
 const events = require('./events');
 const { botActive, BOT_SESSION_SELECT } = require('./bot-mode');
+const avatars = require('./avatars');
 const log = require('./logger');
 
 // avisos de sistema que não são conversa
@@ -61,11 +62,14 @@ function normalize(message) {
     const fromMe = Boolean(message.fromMe || (message.id && message.id.fromMe));
     const chatId = serializedId(message.chatId) || (fromMe ? message.to : message.from);
     const type = message.type || 'chat';
+    const group = Boolean(message.isGroupMsg) || /@g\.us$/.test(serializedId(chatId) || '');
+    const senderName = (message.sender && message.sender.pushname) || message.notifyName || null;
     const isMedia = MEDIA_TYPES.has(type);
     const seconds = message.t || message.timestamp;
     let payload = null;
     if (type === 'location') payload = { lat: message.lat, lng: message.lng, name: message.loc || null };
     if (type === 'vcard' || type === 'multi_vcard') payload = { vcard: message.body };
+    if (group && !fromMe && senderName) payload = { ...(payload || {}), authorName: senderName };
     return {
         waMessageId: serializedId(message.id),
         chatId: serializedId(chatId),
@@ -77,8 +81,9 @@ function normalize(message) {
         author: message.isGroupMsg ? serializedId(message.author) : null,
         mimeType: message.mimetype || null,
         fileName: message.filename || null,
-        pushName: fromMe ? null : (message.sender && message.sender.pushname) || message.notifyName || null,
-        isGroup: Boolean(message.isGroupMsg) || /@g\.us$/.test(chatId || ''),
+        // em grupo o nome é de quem escreveu (fica na mensagem); o nome do grupo vem do WhatsApp (avatars.js)
+        pushName: fromMe || group ? null : senderName,
+        isGroup: group,
         timestamp: seconds ? new Date(seconds * 1000) : new Date(),
         payload,
         isMedia
@@ -86,12 +91,25 @@ function normalize(message) {
 }
 
 function shouldRecord(fields) {
-    return Boolean(fields.chatId) && fields.chatId !== 'status@broadcast' && !IGNORED_TYPES.has(fields.type);
+    return (
+        Boolean(fields.chatId) &&
+        fields.chatId !== 'status@broadcast' &&
+        // canais do WhatsApp (newsletter) não são conversa
+        !/@newsletter$/.test(fields.chatId) &&
+        !IGNORED_TYPES.has(fields.type)
+    );
+}
+
+/** Grupos só entram no histórico se a sessão aceitar grupos no Atendimento. */
+async function groupAllowed(sessionName, fields) {
+    if (!fields.isGroup) return true;
+    const session = await db().session.findUnique({ where: { name: sessionName }, select: { acceptGroups: true } });
+    return Boolean(session && session.acceptGroups);
 }
 
 /**
  * Grava a mensagem: contato, conversa (abre uma nova se a última foi encerrada) e mensagem.
- * meta.origin: contact | phone | api | bot | agent. Dedup por waMessageId: a mensagem enviada pela API
+ * Devolve { message, contact }. meta.origin: contact | phone | api | bot | agent. Dedup por waMessageId: a mensagem enviada pela API
  * também chega pelo onAnyMessage, e quem gravar por último completa os campos.
  */
 async function save(sessionName, fields, meta = {}) {
@@ -110,11 +128,11 @@ async function save(sessionName, fields, meta = {}) {
         orderBy: { id: 'desc' }
     });
     if (!conversation) {
-        // sem bot ativo (desligado ou sem fluxo publicado) a conversa já nasce aguardando atendente
+        // sem bot ativo (desligado ou sem fluxo publicado) a conversa já nasce aguardando atendente;
+        // grupos nunca ficam com o bot
         const session = await db().session.findUnique({ where: { id: sid }, select: BOT_SESSION_SELECT });
-        conversation = await db().conversation.create({
-            data: { sessionId: sid, contactId: contact.id, status: botActive(session) ? 'bot' : 'pending' }
-        });
+        const status = !contact.isGroup && botActive(session) ? 'bot' : 'pending';
+        conversation = await db().conversation.create({ data: { sessionId: sid, contactId: contact.id, status } });
     }
 
     const data = {
@@ -168,7 +186,7 @@ async function save(sessionName, fields, meta = {}) {
         });
         events.emit('message.saved', { session: sessionName, message, conversation, contact });
     }
-    return message;
+    return { message, contact };
 }
 
 function mediaFile(sessionName, waMessageId, mimeType, fileName) {
@@ -198,8 +216,10 @@ function mediaAbsolutePath(relative) {
 async function recordIncoming(sessionName, message, client) {
     try {
         const fields = normalize(message);
-        if (!shouldRecord(fields)) return null;
-        const saved = await save(sessionName, fields);
+        if (!shouldRecord(fields) || !(await groupAllowed(sessionName, fields))) return null;
+        const { message: saved, contact } = await save(sessionName, fields);
+        // foto de perfil em segundo plano (no máximo uma vez por dia por contato)
+        if (!fields.fromMe) avatars.refreshIfStale(sessionName, contact, client);
         if (fields.isMedia && !saved.mediaPath && client && typeof client.decryptFile === 'function') {
             const buffer = await client.decryptFile(message);
             if (buffer.length <= config.mediaMaxBytes) {
@@ -243,11 +263,11 @@ async function recordOutgoing(sessionName, to, content, sent, meta = {}) {
             timestamp: new Date(),
             payload: content.payload || null
         };
-        if (!shouldRecord(fields)) return null;
+        if (!shouldRecord(fields) || !(await groupAllowed(sessionName, fields))) return null;
         const mediaPath = content.buffer
             ? writeMedia(sessionName, fields.waMessageId, content.buffer, fields.mimeType, fields.fileName)
             : null;
-        return await save(sessionName, fields, { ...meta, origin: meta.origin || 'api', mediaPath });
+        return (await save(sessionName, fields, { ...meta, origin: meta.origin || 'api', mediaPath })).message;
     } catch (error) {
         log.error({ session: sessionName, err: error }, 'falha ao gravar mensagem enviada');
         return null;

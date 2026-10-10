@@ -21,6 +21,8 @@ model Session {
   aiAgentId     Int?
   aiAgent       AiAgent?       @relation(fields: [aiAgentId], references: [id], onDelete: SetNull)
   lastState     String?
+  // grupos no Atendimento: false = mensagens de grupo são ignoradas (o bot nunca atende grupos)
+  acceptGroups  Boolean        @default(false)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   webhooks      Webhook[]
@@ -71,19 +73,23 @@ model WebhookDelivery {
 }
 
 model Contact {
-  id            Int            @id @default(autoincrement())
-  sessionId     Int
-  session       Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id              Int            @id @default(autoincrement())
+  sessionId       Int
+  session         Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   // id no WhatsApp: 5511999999999@c.us ou ...@g.us
-  waId          String
+  waId            String
   // nome definido no painel; pushName é o que o próprio contato configurou
-  name          String?
-  pushName      String?
-  isGroup       Boolean        @default(false)
-  tags          Json           @default("[]")
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  conversations Conversation[]
+  name            String?
+  pushName        String?
+  isGroup         Boolean        @default(false)
+  // foto de perfil baixada em DATA_DIR/media (as URLs do WhatsApp expiram)
+  avatarPath      String?
+  // última consulta da foto (também quando não há foto), para não buscar a cada mensagem
+  avatarCheckedAt DateTime?
+  tags            Json           @default("[]")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  conversations   Conversation[]
 
   @@unique([sessionId, waId])
 }

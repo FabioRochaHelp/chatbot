@@ -10,6 +10,7 @@ export const formatNumber = (value: number) => number.format(value);
 
 /** 5563999999999@c.us -> +55 63 99999-9999 (melhor esforço; grupos e ids desconhecidos voltam como vieram). */
 export function formatWaId(waId: string) {
+    if (/@g\.us$/.test(waId)) return 'Grupo do WhatsApp';
     const digits = waId.replace(/@.*$/, '');
     if (!/@c\.us$/.test(waId) || !/^\d+$/.test(digits)) return waId;
     const match = digits.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
