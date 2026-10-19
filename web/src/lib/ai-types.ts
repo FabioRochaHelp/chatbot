@@ -21,6 +21,8 @@ export type AiAgent = {
     knowledge: string;
     historyMessages: number;
     maxRepliesPerHour: number;
+    // fila quando a IA transfere (null = "Sem departamento")
+    handoffDepartmentId: number | null;
     updatedAt: string;
     sessions: string[];
     usage: AiUsageSummary;

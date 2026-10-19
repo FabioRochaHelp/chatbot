@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { db } = require('../../db');
+const departments = require('../../departments');
 
 const DAYS = 7;
 const DAY_MS = 24 * 3600 * 1000;
@@ -29,10 +30,14 @@ module.exports = function statsRoutes({ define }, { Sessions }) {
             path: '/stats',
             tags: ['Painel'],
             summary: 'Números do painel',
-            description: 'Sessões, conversas por status, não lidas e mensagens dos últimos 7 dias.',
+            description:
+                'Sessões, conversas por status (no escopo do usuário: o atendente conta só as que pode ver), ' +
+                'fila por departamento (departmentId null = "Sem departamento"), não lidas e mensagens dos últimos 7 dias.',
             query
         },
-        async ({ query: { tzOffset } }) => {
+        async ({ query: { tzOffset } }, req) => {
+            const scope = await departments.scopeFor(req.principal);
+            const open = { ...scope, status: { not: 'closed' } };
             const today = startOfDay(new Date(), tzOffset);
             const days = Array.from(
                 { length: DAYS },
@@ -43,10 +48,16 @@ module.exports = function statsRoutes({ define }, { Sessions }) {
                     where: { direction, timestamp: { gte: from, lt: new Date(from.getTime() + DAY_MS) } }
                 });
 
-            const [sessionsTotal, byStatus, unread, perDay] = await Promise.all([
+            const [sessionsTotal, byStatus, unread, queues, perDay] = await Promise.all([
                 db().session.count(),
-                db().conversation.groupBy({ by: ['status'], where: { status: { not: 'closed' } }, _count: true }),
-                db().conversation.aggregate({ where: { status: { not: 'closed' } }, _sum: { unreadCount: true } }),
+                db().conversation.groupBy({ by: ['status'], where: open, _count: true }),
+                db().conversation.aggregate({ where: open, _sum: { unreadCount: true } }),
+                db().conversation.groupBy({
+                    by: ['departmentId'],
+                    where: { ...scope, status: 'pending' },
+                    _count: true,
+                    _min: { queuedAt: true }
+                }),
                 Promise.all(days.map(async day => ({ in: await count(day, 'in'), out: await count(day, 'out') })))
             ]);
             const conversations = { bot: 0, pending: 0, open: 0 };
@@ -59,6 +70,11 @@ module.exports = function statsRoutes({ define }, { Sessions }) {
                     connected: memory.filter(session => session.state === 'CONNECTED').length
                 },
                 conversations,
+                queues: queues.map(row => ({
+                    departmentId: row.departmentId,
+                    pending: row._count,
+                    oldestQueuedAt: row._min.queuedAt
+                })),
                 unread: unread._sum.unreadCount || 0,
                 messagesToday: perDay[DAYS - 1],
                 messagesByDay: days.map((day, index) => ({

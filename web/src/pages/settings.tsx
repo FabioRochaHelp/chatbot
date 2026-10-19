@@ -1,8 +1,9 @@
 import { useSearchParams } from 'react-router';
-import { KeyRound, UserRound, Users, Zap } from 'lucide-react';
+import { Building2, KeyRound, UserRound, Users, Zap } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { AccountSettings } from '@/components/settings/account';
 import { ApiKeysSettings } from '@/components/settings/api-keys';
+import { DepartmentsSettings } from '@/components/settings/departments';
 import { QuickRepliesSettings } from '@/components/settings/quick-replies';
 import { UsersSettings } from '@/components/settings/users';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,6 +16,7 @@ export function SettingsPage() {
         ...(admin
             ? [
                   { value: 'users', label: 'Usuários', icon: Users, content: <UsersSettings /> },
+                  { value: 'departments', label: 'Departamentos', icon: Building2, content: <DepartmentsSettings /> },
                   { value: 'quick-replies', label: 'Respostas rápidas', icon: Zap, content: <QuickRepliesSettings /> },
                   { value: 'api-keys', label: 'Chaves de API', icon: KeyRound, content: <ApiKeysSettings /> }
               ]

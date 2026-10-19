@@ -56,6 +56,9 @@ export type FlowNodeData = {
     close?: boolean;
     agentId?: number;
     agentName?: string;
+    // bloco Transferir: fila de destino (sem = "Sem departamento")
+    departmentId?: number;
+    departmentName?: string;
 };
 
 export type FlowSettings = { timeoutMinutes?: number; handoffKeywords?: string[]; handoffText?: string };
@@ -240,6 +243,9 @@ export function nodeSummary(type: FlowNodeType, data: FlowNodeData): string {
             return 'Quando o contato manda mensagem';
         case 'message':
         case 'handoff':
+            if (type === 'handoff' && data.departmentName) {
+                return `${data.departmentName}${data.text ? ' · ' + data.text : ''}`;
+            }
             return data.text || (type === 'handoff' ? 'Sem mensagem' : '');
         case 'menu':
             return data.text || '';

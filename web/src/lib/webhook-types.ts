@@ -1,5 +1,10 @@
 export type WebhookEvent =
-    'message.received' | 'message.sent' | 'conversation.updated' | 'conversation.handoff' | 'session.state';
+    | 'message.received'
+    | 'message.sent'
+    | 'conversation.updated'
+    | 'conversation.handoff'
+    | 'conversation.assigned'
+    | 'session.state';
 
 export type Webhook = {
     id: number;
@@ -47,6 +52,10 @@ export const EVENT_INFO: Record<WebhookEvent, { label: string; description: stri
     'conversation.handoff': {
         label: 'Transferência para a fila',
         description: 'O bot ou a IA passou a conversa para atendentes.'
+    },
+    'conversation.assigned': {
+        label: 'Distribuída a um atendente',
+        description: 'O rodízio de um departamento distribuído entregou a conversa a um atendente.'
     },
     'session.state': { label: 'Status da sessão', description: 'Conectou, caiu, pediu QR code…' }
 };

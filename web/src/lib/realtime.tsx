@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import { authStatusKey, useAuth } from './auth';
 import { contactName, preview } from './contacts';
 import { notify } from './notifications';
@@ -110,6 +111,26 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             refreshLists();
             refreshStats();
         });
+        // fila distribuída: o rodízio entregou uma conversa para este atendente
+        socket.on('conversation.assigned', ({ conversation }: { conversation: Conversation }) => {
+            queryClient.setQueryData(['conversation', conversation.id], conversation);
+            refreshLists();
+            refreshStats();
+            const from = conversation.department ? ` · ${conversation.department.name}` : '';
+            const open = () => navigateRef.current('/inbox/' + conversation.id);
+            notify('Nova conversa para você' + from, contactName(conversation.contact), open);
+            toast.info('Nova conversa para você' + from, {
+                description: contactName(conversation.contact),
+                action: { label: 'Abrir', onClick: open }
+            });
+        });
+        // departamento criado/alterado ou atendente ficou on-line/off-line
+        socket.on('departments.changed', () => {
+            queryClient.invalidateQueries({ queryKey: ['departments'] });
+            refreshLists();
+            refreshStats();
+        });
+        socket.on('presence.changed', () => queryClient.invalidateQueries({ queryKey: ['departments'] }));
         // várias conversas mudaram de uma vez (bot desligado, grupos desligados)
         socket.on('conversations.changed', () => {
             refreshLists();

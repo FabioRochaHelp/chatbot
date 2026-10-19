@@ -11,6 +11,8 @@ export const { db, disconnect } = server('../server/db.js');
 export const { createApp } = server('../server/app.js');
 export const config = server('../server/config.js');
 export const auth = server('../server/auth.js');
+export const presence = server('../server/presence.js');
+export const distributor = server('../server/distributor.js');
 
 /** Zera o banco e as sessões em memória. */
 export async function resetAll() {
@@ -23,7 +25,9 @@ export async function resetAll() {
     await db().aiUsage.deleteMany();
     await db().aiAgent.deleteMany();
     await db().apiKey.deleteMany();
+    await db().department.deleteMany();
     await db().user.deleteMany();
+    presence.reset();
     auth.refreshAuthState();
 }
 

@@ -8,6 +8,8 @@ const messaging = require('../../messaging');
 const history = require('../../history');
 const avatars = require('../../avatars');
 const events = require('../../events');
+const departments = require('../../departments');
+const distributor = require('../../distributor');
 const { AppError } = require('../../errors');
 const { pagination } = require('./router');
 const schemas = require('./schemas');
@@ -23,8 +25,16 @@ const listConversations = z.object({
         .union([z.enum(['me', 'none']), z.coerce.number().int().positive()])
         .optional()
         .describe('me (minhas), none (sem atendente) ou id do usuário'),
+    department: z
+        .union([z.literal('none'), z.coerce.number().int().positive()])
+        .optional()
+        .describe('id do departamento ou none ("Sem departamento")'),
     contact: z.coerce.number().int().positive().optional().describe('id do contato'),
     q: z.string().max(100).optional().describe('busca por nome ou número do contato'),
+    sort: z
+        .enum(['recent', 'queue'])
+        .default('recent')
+        .describe('recent: última mensagem primeiro; queue: ordem de chegada na fila (mais antiga primeiro)'),
     ...pagination
 });
 const listMessages = z.object({
@@ -45,6 +55,7 @@ const withContact = {
     contact: true,
     session: { select: { name: true } },
     assignedUser: { select: { id: true, name: true } },
+    department: { select: { id: true, name: true, mode: true } },
     messages: { where: { direction: { not: 'note' } }, orderBy: { id: 'desc' }, take: 1 }
 };
 
@@ -60,17 +71,47 @@ async function activeUser(id) {
     return user;
 }
 
+/** O atendente não escolhe na fila de departamento distribuído: quem entrega é o rodízio. */
+function ensureCanTake(conversation, principal) {
+    const distributed = conversation.department && conversation.department.mode === 'distribuida';
+    if (principal.role === 'agent' && conversation.status === 'pending' && distributed) {
+        throw new AppError(
+            403,
+            'DISTRIBUTED_QUEUE',
+            'a fila deste departamento é distribuída automaticamente entre os atendentes disponíveis'
+        );
+    }
+}
+
 module.exports = function conversationRoutes({ define }, { Sessions }) {
-    async function findConversation(id) {
-        const conversation = await db().conversation.findUnique({ where: { id }, include: withContact });
+    /** Conversa visível para quem chamou (fora do escopo do atendente: 404). */
+    async function findConversation(id, principal) {
+        const scope = await departments.scopeFor(principal);
+        const conversation = await db().conversation.findFirst({ where: { id, ...scope }, include: withContact });
         if (!conversation) throw new AppError(404, 'CONVERSATION_NOT_FOUND', 'conversa não encontrada');
         return conversation;
     }
 
-    async function updateConversation(id, data) {
-        await db().conversation.update({ where: { id }, data });
-        const conversation = conversationView(await findConversation(id));
-        events.emit('conversation.updated', { conversation });
+    /**
+     * Grava e avisa. Tirar da fila (assumir) só vale se ninguém assumiu antes: dois atendentes
+     * clicando ao mesmo tempo, um recebe 409.
+     */
+    async function updateConversation(current, data) {
+        const taking = current.status === 'pending' && data.status === 'open';
+        if (taking) {
+            const { count } = await db().conversation.updateMany({
+                where: { id: current.id, status: 'pending', assignedUserId: null },
+                data
+            });
+            if (!count) throw new AppError(409, 'ALREADY_ASSIGNED', 'a conversa já foi assumida por outro atendente');
+        } else {
+            await db().conversation.update({ where: { id: current.id }, data });
+        }
+        const conversation = conversationView(await findConversation(current.id));
+        events.emit('conversation.updated', {
+            conversation,
+            previous: { departmentId: current.departmentId, assignedUserId: current.assignedUserId }
+        });
         return conversation;
     }
 
@@ -91,6 +132,7 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             query: listConversations
         },
         async ({ query }, req) => {
+            const scope = await departments.scopeFor(req.principal);
             let assignedUserId;
             if (query.assigned === 'me') {
                 if (!req.principal.user) throw new AppError(400, 'NOT_A_USER', 'assigned=me exige login de usuário');
@@ -98,6 +140,8 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             } else if (query.assigned === 'none') assignedUserId = null;
             else if (query.assigned) assignedUserId = query.assigned;
             const where = {
+                ...scope,
+                ...(query.department ? { departmentId: query.department === 'none' ? null : query.department } : {}),
                 ...(query.session ? { session: { name: query.session } } : {}),
                 ...(query.status ? { status: { in: query.status.split(',') } } : {}),
                 ...(assignedUserId !== undefined ? { assignedUserId } : {}),
@@ -108,7 +152,10 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
                 db().conversation.findMany({
                     where,
                     include: withContact,
-                    orderBy: [{ lastMessageAt: 'desc' }, { id: 'desc' }],
+                    orderBy:
+                        query.sort === 'queue'
+                            ? [{ queuedAt: 'asc' }, { id: 'asc' }]
+                            : [{ lastMessageAt: 'desc' }, { id: 'desc' }],
                     take: query.limit,
                     skip: query.offset
                 }),
@@ -126,7 +173,7 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             summary: 'Detalhe da conversa',
             params: schemas.idParams
         },
-        async ({ params }) => conversationView(await findConversation(params.id))
+        async ({ params }, req) => conversationView(await findConversation(params.id, req.principal))
     );
 
     define(
@@ -134,28 +181,61 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             method: 'patch',
             path: '/conversations/:id',
             tags: ['Conversas'],
-            summary: 'Assume, transfere, devolve ao bot, encerra ou marca como lida',
+            summary: 'Assume, transfere, devolve à fila ou ao bot, encerra ou marca como lida',
             description:
                 'status=open sem assignedUserId atribui a quem chamou. bot/pending tiram o atendente. ' +
                 'Exemplos: assumir {status:"open"}; transferir {status:"open",assignedUserId:2}; ' +
-                'devolver ao bot {status:"bot"}; encerrar {status:"closed"}.',
+                'transferir para departamento {departmentId:3} (null = "Sem departamento"); ' +
+                'devolver à fila {status:"pending"}; devolver ao bot {status:"bot"}; encerrar {status:"closed"}. ' +
+                'Assumir conversa que já foi assumida: 409. Atendente não assume da fila de departamento ' +
+                'distribuído (403).',
             params: schemas.idParams,
             body: schemas.updateConversation
         },
         async ({ params, body }, req) => {
-            const current = await findConversation(params.id);
+            const current = await findConversation(params.id, req.principal);
             const data = {};
-            if (body.assignedUserId !== undefined) {
+            let queueOf;
+            if (body.departmentId !== undefined) {
+                if ((body.status && body.status !== 'pending') || body.assignedUserId) {
+                    throw new AppError(
+                        400,
+                        'INVALID_TRANSFER',
+                        'transferir para departamento coloca a conversa na fila'
+                    );
+                }
+                if (body.departmentId !== null && !(await departments.active(body.departmentId))) {
+                    throw new AppError(400, 'INVALID_DEPARTMENT', 'departamento inexistente ou desativado');
+                }
+                queueOf = body.departmentId;
+            } else if (body.status === 'pending') {
+                // devolver à fila: a do mesmo departamento
+                queueOf = current.departmentId;
+            }
+            if (queueOf !== undefined) {
+                Object.assign(data, departments.queueFields(queueOf), { closedAt: null });
+            } else if (body.assignedUserId !== undefined) {
                 if (body.assignedUserId !== null) await activeUser(body.assignedUserId);
                 data.assignedUserId = body.assignedUserId;
             }
-            if (body.status) {
+            if (body.status === 'open') ensureCanTake(current, req.principal);
+            if (body.status && queueOf === undefined) {
                 data.status = body.status;
                 data.closedAt = body.status === 'closed' ? new Date() : null;
-                if (body.status === 'bot' || body.status === 'pending') {
+                if (body.status === 'bot') {
                     data.assignedUserId = null;
                 } else if (body.status === 'open' && data.assignedUserId === undefined) {
-                    if (req.principal.user) data.assignedUserId = req.principal.user.id;
+                    const user = req.principal.user;
+                    // assumir não tira de outro atendente (para isso, transfira com assignedUserId)
+                    if (
+                        user &&
+                        current.status === 'open' &&
+                        current.assignedUserId &&
+                        current.assignedUserId !== user.id
+                    ) {
+                        throw new AppError(409, 'ALREADY_ASSIGNED', 'a conversa já foi assumida por outro atendente');
+                    }
+                    if (user) data.assignedUserId = user.id;
                     else if (!current.assignedUserId) {
                         throw new AppError(400, 'ASSIGNEE_REQUIRED', 'informe assignedUserId para abrir o atendimento');
                     }
@@ -165,7 +245,12 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
                 data.unreadCount = 0;
                 sendSeen(current);
             }
-            return updateConversation(params.id, data);
+            const conversation = await updateConversation(current, data);
+            if (queueOf) {
+                await distributor.dispatch(queueOf);
+                return conversationView(await findConversation(current.id));
+            }
+            return conversation;
         }
     );
 
@@ -180,7 +265,7 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             body: z.object({ text: z.string().trim().min(1).max(4000) })
         },
         async ({ params, body }, req) => {
-            const conversation = await findConversation(params.id);
+            const conversation = await findConversation(params.id, req.principal);
             return history.addNote(conversation, body.text, req.principal.user && req.principal.user.id);
         }
     );
@@ -195,8 +280,8 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             params: schemas.idParams,
             query: listMessages
         },
-        async ({ params, query }) => {
-            await findConversation(params.id);
+        async ({ params, query }, req) => {
+            await findConversation(params.id, req.principal);
             const rows = await db().message.findMany({
                 where: { conversationId: params.id, ...(query.before ? { id: { lt: query.before } } : {}) },
                 include: history.SENT_BY,
@@ -221,17 +306,18 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             body: schemas.content
         },
         async ({ params, body }, req) => {
-            const conversation = await findConversation(params.id);
+            const conversation = await findConversation(params.id, req.principal);
             const user = req.principal.user;
             if (user && (conversation.status !== 'open' || !conversation.assignedUserId)) {
+                ensureCanTake(conversation, req.principal);
                 // garante que a resposta caia nesta conversa (uma encerrada abriria outra)
-                await updateConversation(conversation.id, {
+                await updateConversation(conversation, {
                     status: 'open',
                     closedAt: null,
                     assignedUserId: conversation.assignedUserId || user.id
                 });
             } else if (conversation.status === 'closed') {
-                await updateConversation(conversation.id, { status: 'bot', closedAt: null });
+                await updateConversation(conversation, { status: 'bot', closedAt: null });
             }
             return messaging.send(
                 Sessions,
@@ -332,8 +418,9 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
         }
     );
 
-    async function findMessage(id) {
-        const message = await db().message.findUnique({ where: { id } });
+    async function findMessage(id, principal) {
+        const scope = await departments.scopeFor(principal);
+        const message = await db().message.findFirst({ where: { id, conversation: scope } });
         if (!message) throw new AppError(404, 'MESSAGE_NOT_FOUND', 'mensagem não encontrada');
         return message;
     }
@@ -346,7 +433,7 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             summary: 'Detalhe da mensagem',
             params: schemas.idParams
         },
-        ({ params }) => findMessage(params.id)
+        ({ params }, req) => findMessage(params.id, req.principal)
     );
 
     define(
@@ -358,7 +445,7 @@ module.exports = function conversationRoutes({ define }, { Sessions }) {
             params: schemas.idParams
         },
         async ({ params }, req, res) => {
-            const message = await findMessage(params.id);
+            const message = await findMessage(params.id, req.principal);
             const file = history.mediaAbsolutePath(message.mediaPath);
             if (!file || !fs.existsSync(file)) {
                 throw new AppError(404, 'MEDIA_NOT_FOUND', 'mensagem sem mídia gravada');

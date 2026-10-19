@@ -129,7 +129,7 @@ module.exports = function sessionRoutes({ define }, { Sessions }) {
                 // bot desligado: quem estava com o bot vai para a fila
                 const moved = await db().conversation.updateMany({
                     where: { sessionId: updated.id, status: 'bot' },
-                    data: { status: 'pending', flowState: Prisma.DbNull }
+                    data: { status: 'pending', queuedAt: new Date(), flowState: Prisma.DbNull }
                 });
                 if (moved.count) events.emit('conversations.changed', { session: params.name });
             }

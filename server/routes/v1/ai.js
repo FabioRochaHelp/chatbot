@@ -18,7 +18,13 @@ const fields = {
     instructions: z.string().max(20000),
     knowledge: z.string().max(200000).describe('base de conhecimento (texto livre)'),
     historyMessages: z.number().int().min(2).max(100),
-    maxRepliesPerHour: z.number().int().min(1).max(500)
+    maxRepliesPerHour: z.number().int().min(1).max(500),
+    handoffDepartmentId: z
+        .number()
+        .int()
+        .positive()
+        .nullable()
+        .describe('departamento da fila quando a IA transfere (null = "Sem departamento")')
 };
 
 const STARTER_INSTRUCTIONS = [
@@ -157,6 +163,12 @@ module.exports = function aiRoutes({ define }) {
         },
         async ({ params, body }) => {
             await find(params.id);
+            if (
+                body.handoffDepartmentId &&
+                !(await db().department.findUnique({ where: { id: body.handoffDepartmentId } }))
+            ) {
+                throw new AppError(400, 'INVALID_DEPARTMENT', 'departamento inexistente');
+            }
             await db().aiAgent.update({ where: { id: params.id }, data: body });
             return view(await find(params.id));
         }

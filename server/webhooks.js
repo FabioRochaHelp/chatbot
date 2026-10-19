@@ -15,7 +15,14 @@ const { version } = require('../package.json');
  * X-ConectZap-Signature: sha256=<hex HMAC-SHA256(secret, `${timestamp}.${corpo}`)>.
  */
 
-const EVENTS = ['message.received', 'message.sent', 'conversation.updated', 'conversation.handoff', 'session.state'];
+const EVENTS = [
+    'message.received',
+    'message.sent',
+    'conversation.updated',
+    'conversation.handoff',
+    'conversation.assigned',
+    'session.state'
+];
 // espera antes de cada nova tentativa (a 1ª tentativa é imediata)
 const BACKOFF_SECONDS = [10, 60, 300, 1800, 7200, 21600];
 const MAX_ATTEMPTS = BACKOFF_SECONDS.length + 1;
@@ -76,6 +83,7 @@ const pickConversation = conversation =>
         id: conversation.id,
         status: conversation.status,
         assignedUserId: conversation.assignedUserId,
+        departmentId: conversation.departmentId ?? null,
         unreadCount: conversation.unreadCount
     };
 
@@ -91,6 +99,13 @@ const listeners = {
     },
     'conversation.updated': ({ conversation }) =>
         enqueue('conversation.updated', conversation.session, {
+            conversation: { ...pickConversation(conversation), assignedUser: conversation.assignedUser || null },
+            contact: pickContact(conversation.contact)
+        }),
+    // distribuída: o rodízio entregou a conversa a um atendente
+    'conversation.assigned': ({ conversation, userId }) =>
+        enqueue('conversation.assigned', conversation.session, {
+            userId,
             conversation: { ...pickConversation(conversation), assignedUser: conversation.assignedUser || null },
             contact: pickContact(conversation.contact)
         }),

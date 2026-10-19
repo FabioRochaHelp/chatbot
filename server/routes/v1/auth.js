@@ -6,6 +6,8 @@ const config = require('../../config');
 const { db } = require('../../db');
 const auth = require('../../auth');
 const events = require('../../events');
+const presence = require('../../presence');
+require('../../distributor'); // distribui ao ficar disponível (presence.changed)
 const { errorBody } = require('../../http');
 const { AppError } = require('../../errors');
 const { ROLES } = require('./router');
@@ -134,10 +136,13 @@ module.exports = function authRoutes({ define }) {
             method: 'patch',
             path: '/auth/me',
             tags,
-            summary: 'Altera o próprio nome ou senha',
-            description: 'Trocar a senha encerra os outros logins.',
+            summary: 'Altera o próprio nome, senha ou disponibilidade',
+            description:
+                'Trocar a senha encerra os outros logins. available: recebe conversas dos departamentos ' +
+                'distribuídos enquanto estiver com o painel aberto.',
             body: z.object({
                 name: name.optional(),
+                available: z.boolean().optional(),
                 currentPassword: z.string().max(200).optional(),
                 newPassword: password.optional()
             })
@@ -147,6 +152,7 @@ module.exports = function authRoutes({ define }) {
             if (!user) throw new AppError(400, 'NOT_A_USER', 'só usuários do painel têm perfil');
             const data = {};
             if (body.name) data.name = body.name;
+            if (body.available !== undefined) data.available = body.available;
             if (body.newPassword) {
                 if (!body.currentPassword || !(await auth.verifyPassword(body.currentPassword, user.passwordHash))) {
                     throw new AppError(400, 'INVALID_PASSWORD', 'senha atual incorreta');
@@ -155,6 +161,9 @@ module.exports = function authRoutes({ define }) {
                 data.tokenVersion = { increment: 1 };
             }
             const updated = await db().user.update({ where: { id: user.id }, data });
+            if (body.available !== undefined && body.available !== user.available) {
+                events.emit('presence.changed', { userId: user.id, connected: presence.isConnected(user.id) });
+            }
             if (body.newPassword) {
                 events.emit('user.revoked', { userId: user.id });
                 setSessionCookie(res, await auth.signSession(updated));

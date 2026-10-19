@@ -314,7 +314,12 @@ async function run(definition, state, input, context = {}, io = {}) {
 
             case 'handoff':
                 if (data.text) replies.push(render(data.text, vars));
-                effects.push({ type: 'handoff', reason: 'flow' });
+                // departamento escolhido no bloco (sem ele: fila "Sem departamento")
+                effects.push({
+                    type: 'handoff',
+                    reason: 'flow',
+                    ...(data.departmentId ? { departmentId: data.departmentId } : {})
+                });
                 return finish();
 
             case 'ai':

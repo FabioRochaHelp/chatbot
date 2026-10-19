@@ -95,25 +95,31 @@ model Contact {
 }
 
 model Conversation {
-  id             Int       @id @default(autoincrement())
+  id             Int         @id @default(autoincrement())
   sessionId      Int
-  session        Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session        Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   contactId      Int
-  contact        Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact        Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   // bot | pending (aguardando atendente) | open (com atendente) | closed
-  status         String    @default("bot")
+  status         String      @default("bot")
   assignedUserId Int?
-  assignedUser   User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  assignedUser   User?       @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
   // estado do motor de fluxos (nó atual, variáveis)
   flowState      Json?
-  unreadCount    Int       @default(0)
-  lastMessageAt  DateTime  @default(now())
-  createdAt      DateTime  @default(now())
+  unreadCount    Int         @default(0)
+  lastMessageAt  DateTime    @default(now())
+  createdAt      DateTime    @default(now())
   closedAt       DateTime?
+  // departamento da fila (null = "Sem departamento")
+  departmentId   Int?
+  department     Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  // quando entrou na fila (ordem de atendimento e tempo de espera)
+  queuedAt       DateTime?
   messages       Message[]
 
   @@index([sessionId, status, lastMessageAt])
   @@index([contactId, status])
+  @@index([departmentId, status, queuedAt])
 }
 
 model Message {
@@ -149,22 +155,50 @@ model Message {
 }
 
 model User {
-  id            Int            @id @default(autoincrement())
-  email         String         @unique
+  id            Int              @id @default(autoincrement())
+  email         String           @unique
   name          String
   // scrypt$N$r$p$salt$hash
   passwordHash  String
   // admin | agent
-  role          String         @default("agent")
-  active        Boolean        @default(true)
+  role          String           @default("agent")
+  active        Boolean          @default(true)
   // incrementado ao trocar senha/desativar: invalida os logins ativos
-  tokenVersion  Int            @default(0)
+  tokenVersion  Int              @default(0)
   lastLoginAt   DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  // botão "Disponível": só recebe conversas distribuídas com o painel aberto e disponível
+  available     Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   apiKeys       ApiKey[]
   conversations Conversation[]
   messages      Message[]
+  departments   DepartmentUser[]
+}
+
+model Department {
+  id            Int              @id @default(autoincrement())
+  name          String           @unique
+  // esteira (o atendente escolhe na fila) | distribuida (rodízio entre os disponíveis)
+  mode          String           @default("esteira")
+  active        Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  members       DepartmentUser[]
+  conversations Conversation[]
+  aiAgents      AiAgent[]
+}
+
+model DepartmentUser {
+  departmentId   Int
+  department     Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  userId         Int
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // última conversa recebida no rodízio (o próximo é quem recebeu há mais tempo)
+  lastAssignedAt DateTime?
+
+  @@id([departmentId, userId])
+  @@index([userId])
 }
 
 model ApiKey {
@@ -206,23 +240,26 @@ model Flow {
 }
 
 model AiAgent {
-  id                Int       @id @default(autoincrement())
-  name              String
-  model             String    @default("claude-opus-5")
+  id                  Int         @id @default(autoincrement())
+  name                String
+  model               String      @default("claude-opus-5")
   // low | medium | high (profundidade do raciocínio; chat costuma ir bem em low)
-  effort            String    @default("low")
+  effort              String      @default("low")
   // como o assistente deve se comportar (tom, o que pode ou não fazer)
-  instructions      String    @default("")
+  instructions        String      @default("")
   // fatos da empresa: horários, preços, políticas, perguntas frequentes
-  knowledge         String    @default("")
+  knowledge           String      @default("")
   // mensagens anteriores da conversa enviadas como contexto
-  historyMessages   Int       @default(20)
+  historyMessages     Int         @default(20)
   // respostas por conversa por hora; acima disso transfere para atendente
-  maxRepliesPerHour Int       @default(20)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  sessions          Session[]
-  usage             AiUsage[]
+  maxRepliesPerHour   Int         @default(20)
+  // departamento da fila quando a IA transfere (null = "Sem departamento")
+  handoffDepartmentId Int?
+  handoffDepartment   Department? @relation(fields: [handoffDepartmentId], references: [id], onDelete: SetNull)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  sessions            Session[]
+  usage               AiUsage[]
 }
 
 model AiUsage {

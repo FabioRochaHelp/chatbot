@@ -6,6 +6,8 @@ export type User = {
     name: string;
     role: 'admin' | 'agent';
     active: boolean;
+    // "Disponível": recebe conversas dos departamentos distribuídos
+    available: boolean;
     lastLoginAt: string | null;
     createdAt: string;
 };
@@ -33,6 +35,8 @@ export type Session = {
 export type Stats = {
     sessions: { total: number; connected: number };
     conversations: { bot: number; pending: number; open: number };
+    // fila por departamento (null = "Sem departamento"), no escopo do usuário
+    queues: { departmentId: number | null; pending: number; oldestQueuedAt: string | null }[];
     unread: number;
     messagesToday: { in: number; out: number };
     messagesByDay: { date: string; in: number; out: number }[];
@@ -89,8 +93,36 @@ export type Conversation = {
     lastMessageAt: string;
     createdAt: string;
     closedAt: string | null;
+    departmentId: number | null;
+    department: { id: number; name: string; mode: DepartmentMode } | null;
+    queuedAt: string | null;
     contact: Contact;
     lastMessage: Message | null;
+};
+
+// esteira: o atendente escolhe na fila; distribuida: rodízio entre os disponíveis
+export type DepartmentMode = 'esteira' | 'distribuida';
+
+export type DepartmentMember = {
+    id: number;
+    name: string;
+    role: 'admin' | 'agent';
+    active: boolean;
+    available: boolean;
+    // painel aberto e disponível
+    online: boolean;
+    lastAssignedAt: string | null;
+};
+
+export type Department = {
+    id: number;
+    name: string;
+    mode: DepartmentMode;
+    active: boolean;
+    pending: number;
+    // o usuário é atendente do departamento
+    mine: boolean;
+    members: DepartmentMember[];
 };
 
 export type DirectoryUser = { id: number; name: string; role: 'admin' | 'agent' };

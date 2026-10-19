@@ -54,6 +54,13 @@ module.exports = {
     updateConversation: z.object({
         status: z.enum(statuses).optional(),
         assignedUserId: z.number().int().positive().nullable().optional().describe('atendente (null tira)'),
+        departmentId: z
+            .number()
+            .int()
+            .positive()
+            .nullable()
+            .optional()
+            .describe('transfere para a fila do departamento (null = "Sem departamento")'),
         read: z.literal(true).optional().describe('zera o contador de não lidas')
     }),
     updateContact: z.object({
