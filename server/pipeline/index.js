@@ -10,18 +10,18 @@ const { botActive } = require('../bot-mode');
 const history = require('../history');
 const ai = require('./ai');
 const metrics = require('../metrics');
+const departments = require('../departments');
+const distributor = require('../distributor');
 
 // uma mensagem por vez em cada conversa (respostas rápidas em sequência não se atropelam)
 const queues = new Map();
 function serialize(key, task) {
     const previous = queues.get(key) || Promise.resolve();
     const current = previous.then(task, task);
-    queues.set(
-        key,
-        current.catch(() => null)
-    );
-    current.finally(() => {
-        if (queues.get(key) === current) queues.delete(key);
+    const guarded = current.catch(() => null);
+    queues.set(key, guarded);
+    guarded.then(() => {
+        if (queues.get(key) === guarded) queues.delete(key);
     });
     return current;
 }
@@ -34,23 +34,18 @@ function inputText(message) {
     return message.body || message.caption || '';
 }
 
-async function updateConversation(conversationId, data) {
-    const conversation = await db().conversation.update({
-        where: { id: conversationId },
-        data,
-        include: {
-            contact: true,
-            session: { select: { name: true } },
-            assignedUser: { select: { id: true, name: true } }
-        }
-    });
+async function updateConversation(current, data) {
+    const conversation = await db().conversation.update({ where: { id: current.id }, data, include: distributor.VIEW });
     const { session, ...rest } = conversation;
-    events.emit('conversation.updated', { conversation: { ...rest, session: session.name, lastMessage: null } });
+    events.emit('conversation.updated', {
+        conversation: { ...rest, session: session.name, lastMessage: null },
+        previous: { departmentId: current.departmentId, assignedUserId: current.assignedUserId }
+    });
     return conversation;
 }
 
 /**
- * Aplica os efeitos do fluxo: transferir, etiquetar, encerrar.
+ * Aplica os efeitos do fluxo: transferir (para a fila do departamento), etiquetar, encerrar.
  */
 async function applyEffects(conversation, effects) {
     const data = {};
@@ -67,8 +62,9 @@ async function applyEffects(conversation, effects) {
             }
         }
         if (effect.type === 'handoff') {
-            data.status = 'pending';
-            data.assignedUserId = null;
+            // departamento inexistente ou desativado: fila "Sem departamento"
+            const department = await departments.active(effect.departmentId);
+            Object.assign(data, departments.queueFields(department && department.id));
             data.handoffReason = effect.reason;
         }
         if (effect.type === 'end' && effect.close) {
@@ -88,9 +84,14 @@ const AI_OUTCOME_TO_HANDOFF = {
 /** Atende com o assistente de IA. Devolve { replies, effects, state } no mesmo formato do fluxo. */
 async function runAi(conversation, agentId) {
     const keep = { mode: 'ai', agentId, updatedAt: new Date().toISOString() };
-    const handoff = (reason, note) => ({ replies: [], effects: [{ type: 'handoff', reason, note }], state: null });
-
     const agent = agentId ? await db().aiAgent.findUnique({ where: { id: agentId } }) : null;
+    // transferência pela IA vai para o departamento configurado no assistente
+    const departmentId = agent ? agent.handoffDepartmentId : null;
+    const handoff = (reason, note) => ({
+        replies: [],
+        effects: [{ type: 'handoff', reason, note, departmentId }],
+        state: null
+    });
     if (!agent) return handoff('ai-unavailable', 'assistente de IA não encontrado');
     if (!ai.available()) return handoff('ai-unavailable', 'IA sem ANTHROPIC_API_KEY configurada');
 
@@ -135,11 +136,11 @@ async function runAi(conversation, agentId) {
             outcome: result.outcome
         }
     });
-    const effects = result.effects.map(effect =>
-        effect.type === 'handoff' && !effect.note && AI_OUTCOME_TO_HANDOFF[result.outcome]
-            ? { ...effect, note: AI_OUTCOME_TO_HANDOFF[result.outcome] }
-            : effect
-    );
+    const effects = result.effects.map(effect => {
+        if (effect.type !== 'handoff') return effect;
+        const note = effect.note || AI_OUTCOME_TO_HANDOFF[result.outcome];
+        return { ...effect, departmentId, ...(note ? { note } : {}) };
+    });
     const finished = effects.some(effect => effect.type === 'handoff' || effect.type === 'end');
     return { replies: result.replies, effects, state: finished ? null : keep };
 }
@@ -171,7 +172,7 @@ function handle(Sessions, sessionName, message) {
         if (contact.isGroup) return null;
         if (!botActive(session)) {
             // bot desligado depois que a conversa começou: a conversa vai para a fila
-            await updateConversation(conversation.id, { status: 'pending', flowState: Prisma.DbNull });
+            await updateConversation(conversation, { ...departments.queueFields(null), flowState: Prisma.DbNull });
             return null;
         }
 
@@ -216,10 +217,19 @@ function handle(Sessions, sessionName, message) {
         await noteEffects(conversation, result.effects);
         // Json? no Prisma: null precisa ser DbNull
         const { handoffReason, ...changes } = await applyEffects(conversation, result.effects);
-        await updateConversation(conversation.id, { flowState: result.state ?? Prisma.DbNull, ...changes });
+        const updated = await updateConversation(conversation, {
+            flowState: result.state ?? Prisma.DbNull,
+            ...changes
+        });
         // avisado depois de gravar: quem ouve (webhooks) lê o status novo
-        if (handoffReason)
-            events.emit('conversation.handoff', { conversationId: conversation.id, reason: handoffReason });
+        if (handoffReason) {
+            events.emit('conversation.handoff', {
+                conversationId: conversation.id,
+                reason: handoffReason,
+                departmentId: updated.departmentId
+            });
+            await distributor.dispatch(updated.departmentId);
+        }
         return result;
     });
 }

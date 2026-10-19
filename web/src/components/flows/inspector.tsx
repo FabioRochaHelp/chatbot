@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useAiAgents } from '@/lib/ai-queries';
+import { useDepartments } from '@/lib/queries';
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -117,6 +118,46 @@ function ListRow({
     );
 }
 
+function DepartmentField({ data, set }: { data: FlowNodeData; set: (patch: Partial<FlowNodeData>) => void }) {
+    const { data: departments } = useDepartments();
+    const missing = data.departmentId && departments && !departments.some(item => item.id === data.departmentId);
+    return (
+        <>
+            <Field
+                label="Departamento"
+                hint={
+                    missing
+                        ? 'O departamento escolhido foi removido ou desativado: a conversa vai para “Sem departamento”.'
+                        : 'A conversa entra na fila deste departamento.'
+                }
+            >
+                <Select
+                    value={data.departmentId ?? ''}
+                    onChange={event => {
+                        const department = departments?.find(item => item.id === Number(event.target.value));
+                        set({ departmentId: department?.id, departmentName: department?.name });
+                    }}
+                >
+                    <option value="">Sem departamento</option>
+                    {departments?.map(department => (
+                        <option key={department.id} value={department.id}>
+                            {department.name}
+                        </option>
+                    ))}
+                </Select>
+            </Field>
+            {departments?.length === 0 && (
+                <Link
+                    to="/settings?tab=departments"
+                    className="text-[13px] text-primary underline-offset-4 hover:underline"
+                >
+                    Criar departamentos
+                </Link>
+            )}
+        </>
+    );
+}
+
 function AiNodeFields({ data, set }: { data: FlowNodeData; set: (patch: Partial<FlowNodeData>) => void }) {
     const { data: agents } = useAiAgents();
     return (
@@ -193,9 +234,13 @@ function Body({
                     </Field>
                     <VariableChips variables={variables} />
                     {type === 'handoff' && (
-                        <p className="text-[13px] text-muted-foreground">
-                            A conversa vai para a Fila do atendimento e o bot para de responder.
-                        </p>
+                        <>
+                            <DepartmentField data={data} set={set} />
+                            <p className="text-[13px] text-muted-foreground">
+                                A conversa vai para a Fila do atendimento e o bot para de responder. Depois de um menu,
+                                use um bloco Transferir por opção para separar os departamentos.
+                            </p>
+                        </>
                     )}
                 </>
             );

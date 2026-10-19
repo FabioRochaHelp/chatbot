@@ -10,14 +10,14 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { avatarUrl, contactName, preview, STATUS_LABEL } from '@/lib/contacts';
 import { notificationsSupported } from '@/lib/notifications';
-import { useSessions } from '@/lib/queries';
+import { useDepartments, useSessions } from '@/lib/queries';
 import type { Conversation } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, relativeTime } from '@/lib/utils';
 
 export type Filter = 'queue' | 'mine' | 'open' | 'closed';
 
 const FILTERS: { value: Filter; label: string; query: string; userOnly?: boolean }[] = [
-    { value: 'queue', label: 'Fila', query: 'status=pending' },
+    { value: 'queue', label: 'Fila', query: 'status=pending&sort=queue' },
     { value: 'mine', label: 'Minhas', query: 'status=open&assigned=me', userOnly: true },
     { value: 'open', label: 'Abertas', query: 'status=bot,pending,open' },
     { value: 'closed', label: 'Encerradas', query: 'status=closed' }
@@ -63,10 +63,14 @@ function NotificationsButton() {
 }
 
 export function ConversationList({ filter, onFilter }: { filter: Filter; onFilter: (filter: Filter) => void }) {
-    const { user } = useAuth();
+    const { user, canManage } = useAuth();
     const { data: sessions } = useSessions();
+    const { data: allDepartments } = useDepartments();
+    // o atendente só filtra pelos departamentos dele (são os que ele enxerga)
+    const departments = (allDepartments ?? []).filter(item => canManage || item.mine);
     const [search, setSearch] = useState('');
     const [session, setSession] = useState('');
+    const [department, setDepartment] = useState('');
     const q = useDebounced(search.trim());
     const filters = FILTERS.filter(item => !item.userOnly || user);
     const current = filters.find(item => item.value === filter) ?? filters[0];
@@ -74,7 +78,8 @@ export function ConversationList({ filter, onFilter }: { filter: Filter; onFilte
     const params = [
         current.query,
         q && 'q=' + encodeURIComponent(q),
-        session && 'session=' + encodeURIComponent(session)
+        session && 'session=' + encodeURIComponent(session),
+        department && 'department=' + department
     ]
         .filter(Boolean)
         .join('&');
@@ -130,6 +135,22 @@ export function ConversationList({ filter, onFilter }: { filter: Filter; onFilte
                             className="h-8 pl-8"
                         />
                     </div>
+                    {departments.length > 0 && (
+                        <Select
+                            value={department}
+                            onChange={event => setDepartment(event.target.value)}
+                            aria-label="Departamento"
+                            className="h-8 w-auto max-w-36"
+                        >
+                            <option value="">Todos</option>
+                            {departments.map(item => (
+                                <option key={item.id} value={item.id}>
+                                    {item.name}
+                                </option>
+                            ))}
+                            <option value="none">Sem departamento</option>
+                        </Select>
+                    )}
                     {sessions && sessions.length > 1 && (
                         <Select
                             value={session}
@@ -218,11 +239,22 @@ export function ConversationList({ filter, onFilter }: { filter: Filter; onFilte
                                                     </span>
                                                 )}
                                             </div>
-                                            {current.value === 'open' && (
-                                                <p className="mt-1 text-[11px] text-muted-foreground">
-                                                    {conversation.status === 'open' && conversation.assignedUser
-                                                        ? conversation.assignedUser.name
-                                                        : STATUS_LABEL[conversation.status]}
+                                            {(current.value === 'open' ||
+                                                current.value === 'queue' ||
+                                                conversation.department) && (
+                                                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                                                    {conversation.department && (
+                                                        <span className="rounded bg-muted px-1.5 font-medium">
+                                                            {conversation.department.name}
+                                                        </span>
+                                                    )}
+                                                    {current.value === 'queue' && conversation.queuedAt && (
+                                                        <span>na fila {relativeTime(conversation.queuedAt)}</span>
+                                                    )}
+                                                    {current.value === 'open' &&
+                                                        (conversation.status === 'open' && conversation.assignedUser
+                                                            ? conversation.assignedUser.name
+                                                            : STATUS_LABEL[conversation.status])}
                                                 </p>
                                             )}
                                         </div>

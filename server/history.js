@@ -132,7 +132,9 @@ async function save(sessionName, fields, meta = {}) {
         // grupos nunca ficam com o bot
         const session = await db().session.findUnique({ where: { id: sid }, select: BOT_SESSION_SELECT });
         const status = !contact.isGroup && botActive(session) ? 'bot' : 'pending';
-        conversation = await db().conversation.create({ data: { sessionId: sid, contactId: contact.id, status } });
+        conversation = await db().conversation.create({
+            data: { sessionId: sid, contactId: contact.id, status, queuedAt: status === 'pending' ? new Date() : null }
+        });
     }
 
     const data = {

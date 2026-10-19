@@ -13,12 +13,20 @@ import { Input, Select, Textarea } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, ApiError } from '@/lib/api';
 import { useAiStatus } from '@/lib/ai-queries';
+import { useDepartments } from '@/lib/queries';
 import { EFFORTS, formatUsd, type AiAgent } from '@/lib/ai-types';
 import { cn, formatNumber } from '@/lib/utils';
 
 type Form = Pick<
     AiAgent,
-    'name' | 'model' | 'effort' | 'instructions' | 'knowledge' | 'historyMessages' | 'maxRepliesPerHour'
+    | 'name'
+    | 'model'
+    | 'effort'
+    | 'instructions'
+    | 'knowledge'
+    | 'historyMessages'
+    | 'maxRepliesPerHour'
+    | 'handoffDepartmentId'
 >;
 const pick = (agent: AiAgent): Form => ({
     name: agent.name,
@@ -27,7 +35,8 @@ const pick = (agent: AiAgent): Form => ({
     instructions: agent.instructions,
     knowledge: agent.knowledge,
     historyMessages: agent.historyMessages,
-    maxRepliesPerHour: agent.maxRepliesPerHour
+    maxRepliesPerHour: agent.maxRepliesPerHour,
+    handoffDepartmentId: agent.handoffDepartmentId
 });
 
 const KNOWLEDGE_PLACEHOLDER = `Ex.:
@@ -40,6 +49,7 @@ Pagamento: Pix, cartão em até 6x sem juros.`;
 function Editor({ agent }: { agent: AiAgent }) {
     const queryClient = useQueryClient();
     const { data: status } = useAiStatus();
+    const { data: departments } = useDepartments();
     const [form, setForm] = useState<Form>(() => pick(agent));
     const dirty = JSON.stringify(form) !== JSON.stringify(pick(agent));
     const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
@@ -201,6 +211,28 @@ function Editor({ agent }: { agent: AiAgent }) {
                                     value={form.maxRepliesPerHour}
                                     onChange={event => set('maxRepliesPerHour', Number(event.target.value) || 20)}
                                 />
+                            </Field>
+                            <Field
+                                label="Departamento ao transferir"
+                                hint="Fila que recebe a conversa quando a IA transfere (pedido, erro ou limite)."
+                                className="sm:col-span-2"
+                            >
+                                <Select
+                                    value={form.handoffDepartmentId ?? ''}
+                                    onChange={event =>
+                                        set(
+                                            'handoffDepartmentId',
+                                            event.target.value ? Number(event.target.value) : null
+                                        )
+                                    }
+                                >
+                                    <option value="">Sem departamento</option>
+                                    {departments?.map(department => (
+                                        <option key={department.id} value={department.id}>
+                                            {department.name}
+                                        </option>
+                                    ))}
+                                </Select>
                             </Field>
                         </CardContent>
                     </Card>

@@ -19,12 +19,13 @@ import {
     Workflow
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, SheetContent } from '@/components/ui/dialog';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip';
-import { useAuth, useLogout } from '@/lib/auth';
-import { useStats } from '@/lib/queries';
+import { useAuth, useAvailability, useLogout } from '@/lib/auth';
+import { useDepartments, useStats } from '@/lib/queries';
 import { useRealtime } from '@/lib/realtime-context';
 import { useSidebarCollapsed } from '@/lib/sidebar';
 import { useTheme, type Theme } from '@/lib/theme';
@@ -147,6 +148,54 @@ function ThemeSwitcher({ collapsed }: { collapsed: boolean }) {
     );
 }
 
+/** "Disponível": só aparece para quem é atendente de algum departamento distribuído. */
+function AvailabilityToggle({ collapsed }: { collapsed: boolean }) {
+    const { user } = useAuth();
+    const { data: departments } = useDepartments();
+    const availability = useAvailability();
+    const distributed = (departments ?? []).some(item => item.mine && item.mode === 'distribuida');
+    if (!user || !distributed) return null;
+    const available = availability.isPending ? availability.variables : user.available;
+    const label = available ? 'Disponível: recebendo conversas' : 'Pausado: não recebe conversas novas';
+    if (collapsed) {
+        return (
+            <Tooltip content={`${label} (clique para ${available ? 'pausar' : 'ficar disponível'})`}>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="mx-auto"
+                    onClick={() => availability.mutate(!available)}
+                    aria-label={label}
+                    aria-pressed={available}
+                >
+                    <span
+                        className={cn(
+                            'size-3 rounded-full ring-2',
+                            available ? 'bg-primary ring-primary-soft' : 'bg-muted-foreground/40 ring-muted'
+                        )}
+                        aria-hidden
+                    />
+                </Button>
+            </Tooltip>
+        );
+    }
+    return (
+        <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+            <span className="min-w-0">
+                <span className="block text-sm font-medium">{available ? 'Disponível' : 'Pausado'}</span>
+                <span className="block text-xs text-muted-foreground">
+                    {available ? 'Recebendo conversas' : 'Não recebe conversas novas'}
+                </span>
+            </span>
+            <Switch
+                checked={available}
+                onCheckedChange={value => availability.mutate(value)}
+                aria-label="Disponível para receber conversas"
+            />
+        </label>
+    );
+}
+
 function SidebarFooter({ collapsed }: { collapsed: boolean }) {
     const { user, principal } = useAuth();
     const { connected } = useRealtime();
@@ -157,6 +206,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
     if (collapsed) {
         return (
             <div className="grid justify-items-center gap-2 border-t pt-4">
+                <AvailabilityToggle collapsed />
                 <Tooltip content={status}>
                     <span className="flex size-9 items-center justify-center" role="status" aria-label={status}>
                         <span
@@ -197,6 +247,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
 
     return (
         <div className="grid gap-3 border-t pt-4">
+            <AvailabilityToggle collapsed={false} />
             <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground" role="status">
                 <span className={cn('size-2 rounded-full', connected ? 'bg-primary' : 'bg-warning')} aria-hidden />
                 {status}

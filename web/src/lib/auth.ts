@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
-import type { AuthStatus } from './types';
+import type { AuthStatus, User } from './types';
 
 export const authStatusKey = ['auth', 'status'];
 
@@ -19,6 +19,20 @@ export function useAuth() {
         canManage: principal ? principal.role !== 'agent' : false,
         isOpenMode: principal?.type === 'open'
     };
+}
+
+/** Liga/desliga o "Disponível" (receber conversas dos departamentos distribuídos). */
+export function useAvailability() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (available: boolean) => api.patch<User>('/auth/me', { available }),
+        onSuccess: user => {
+            queryClient.setQueryData<AuthStatus>(authStatusKey, status =>
+                status?.principal ? { ...status, principal: { ...status.principal, user } } : status
+            );
+            queryClient.invalidateQueries({ queryKey: ['departments'] });
+        }
+    });
 }
 
 export function useLogout() {

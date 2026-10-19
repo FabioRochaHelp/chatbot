@@ -86,6 +86,22 @@ new client.Gauge({
     }
 });
 new client.Gauge({
+    name: 'conectzap_queue_pending',
+    help: 'Conversas aguardando atendente por departamento',
+    labelNames: ['department'],
+    registers: [registry],
+    async collect() {
+        this.reset();
+        const [rows, names] = await Promise.all([
+            db().conversation.groupBy({ by: ['departmentId'], where: { status: 'pending' }, _count: true }),
+            db().department.findMany({ select: { id: true, name: true } })
+        ]);
+        const nameOf = new Map(names.map(row => [row.id, row.name]));
+        for (const row of rows)
+            this.set({ department: nameOf.get(row.departmentId) || 'sem-departamento' }, row._count);
+    }
+});
+new client.Gauge({
     name: 'conectzap_webhook_queue',
     help: 'Entregas de webhook aguardando envio',
     registers: [registry],

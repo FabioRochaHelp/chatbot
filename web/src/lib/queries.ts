@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
-import type { DirectoryUser, QuickReply, Session, Stats } from './types';
+import type { Department, DirectoryUser, QuickReply, Session, Stats } from './types';
 
 export function useSessions() {
     return useQuery({ queryKey: ['sessions'], queryFn: () => api.get<Session[]>('/sessions') });
@@ -25,6 +25,14 @@ export function useDirectory() {
     return useQuery({
         queryKey: ['users', 'directory'],
         queryFn: () => api.get<DirectoryUser[]>('/users/directory'),
+        staleTime: 60000
+    });
+}
+
+export function useDepartments() {
+    return useQuery({
+        queryKey: ['departments'],
+        queryFn: () => api.get<Department[]>('/departments'),
         staleTime: 60000
     });
 }

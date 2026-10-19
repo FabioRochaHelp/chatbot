@@ -62,13 +62,13 @@ Dados ficam em dois volumes (os nomes vêm de quando o projeto se chamava MyZap 
 | Área | O que faz | Quem vê |
 |---|---|---|
 | Painel | Sessões conectadas, fila, conversas em atendimento, não lidas e mensagens dos últimos 7 dias. | Todos |
-| Atendimento | Filas *Fila*, *Minhas*, *Abertas* e *Encerradas*. Assumir, transferir, devolver à fila ou ao bot, encerrar e reabrir. Notas internas, `/atalho` para respostas rápidas, anexos, etiquetas e notificação do navegador. | Todos |
+| Atendimento | Filas *Fila*, *Minhas*, *Abertas* e *Encerradas*, com filtro por departamento. Assumir, transferir (para um atendente ou departamento), devolver à fila ou ao bot, encerrar e reabrir. Notas internas, `/atalho` para respostas rápidas, anexos, etiquetas e notificação do navegador. | Todos |
 | Sessões | Criar, conectar pelo QR code (atualiza ao vivo), reconectar, fechar, escolher o bot e excluir. Atendentes só consultam. | Todos |
 | Fluxos | Editor visual, simulador com o rascunho, validação e publicação por versões. | Administradores |
 | Assistentes de IA | Instruções, base de conhecimento, modelo, estilo de resposta, limites, playground e custo dos últimos 30 dias. | Administradores |
 | Enviar mensagem | Teste de envio pela API com o `curl` equivalente. | Administradores |
 | Webhooks | Cadastro, segredo da assinatura, envio de teste e histórico de entregas com reenvio. | Administradores |
-| Configurações | Usuários (administradores e atendentes), respostas rápidas, chaves de API e troca de senha. | Administradores (Minha conta: todos) |
+| Configurações | Usuários (administradores e atendentes), departamentos, respostas rápidas, chaves de API e troca de senha. | Administradores (Minha conta: todos) |
 
 Como as conversas andam:
 
@@ -77,6 +77,17 @@ Como as conversas andam:
 - **Grupos:** o bot nunca responde grupos. Por padrão as mensagens de grupo são ignoradas (não entram no Atendimento). Para atender grupos com a equipe, ligue *Sessões → sessão → Grupos no Atendimento*; desligar encerra as conversas de grupo abertas (o histórico fica). Canais do WhatsApp são sempre ignorados.
 - **Fotos de perfil:** baixadas quando o contato manda mensagem (no máximo uma vez por dia) e guardadas em `DATA_DIR/media/avatars`, porque os links do WhatsApp expiram. Contatos com foto privada ficam com as iniciais. Em grupos, o nome do grupo também vem do WhatsApp.
 - Responder pelo painel assume a conversa. Responder uma conversa encerrada a reabre.
+
+### Departamentos
+
+Em *Configurações → Departamentos*, cada departamento tem seus atendentes e um modo:
+
+- **Esteira:** a conversa espera na fila do departamento e o atendente escolhe quem vai atender (*Assumir*). Se dois clicarem ao mesmo tempo, só o primeiro fica com ela.
+- **Distribuída:** o sistema entrega as conversas em rodízio, uma para cada atendente, na ordem de chegada. Só recebe quem está com o painel aberto e com **Disponível** ligado (no menu lateral). Ninguém disponível: a conversa espera e é entregue quando alguém ficar disponível. Quem fecha o painel ou pausa mantém as conversas que já tem. O atendente não escolhe na fila distribuída; o administrador pode atribuir manualmente.
+
+Como a conversa chega ao departamento: pelo bloco **Transferir** do fluxo (escolha o departamento; depois de um menu, um bloco por opção), pelo campo *Departamento ao transferir* do assistente de IA ou por transferência manual (*Mais → Transferir para…*). O resto (bot desligado, grupos, palavra-chave, erros) vai para a fila **Sem departamento**, que funciona como esteira e todos veem.
+
+O atendente vê só as conversas dos seus departamentos, a fila *Sem departamento* e as que estão com ele. Administradores veem tudo. A presença (painel aberto) fica na memória do processo: rode uma instância só do servidor.
 
 ### Bot de fluxos
 
@@ -142,7 +153,8 @@ Cadastre em **Webhooks** (ou `POST /api/v1/webhooks`). Para cada evento escolhid
 | `message.received` | Mensagem recebida de um contato. |
 | `message.sent` | Mensagem enviada pela API, bot, IA, atendente ou pelo celular. |
 | `conversation.updated` | Conversa mudou de status ou de atendente. |
-| `conversation.handoff` | Bot ou IA transferiu para a fila (com o motivo). |
+| `conversation.handoff` | Bot ou IA transferiu para a fila (com o motivo e o `departmentId`). |
+| `conversation.assigned` | O rodízio de um departamento distribuído entregou a conversa a um atendente. |
 | `session.state` | A sessão conectou, caiu ou pediu QR code. |
 
 - **Assinatura:** cada envio traz `X-ConectZap-Timestamp` e `X-ConectZap-Signature: sha256=<HMAC-SHA256 de "timestamp.corpo" com o segredo>`. Confira com o corpo bruto e recuse timestamps antigos. A tela do webhook tem o segredo e um exemplo em Node.js.

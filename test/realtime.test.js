@@ -89,6 +89,23 @@ describe('realtime', () => {
         expect(received).toEqual([]);
     });
 
+    it('atendente só recebe eventos das conversas que pode ver', async () => {
+        const socket = connect({ extraHeaders: { cookie: agentCookie } });
+        await once(socket, 'sessions');
+        const received = [];
+        socket.on('message.saved', payload => received.push(payload.message.body));
+        const visible = once(socket, 'conversation.updated');
+        events.emit('message.saved', { message: { body: 'outro departamento' }, conversation: { departmentId: 999 } });
+        events.emit('message.saved', { message: { body: 'sem departamento' }, conversation: { departmentId: null } });
+        events.emit('conversation.updated', {
+            conversation: { id: 1, departmentId: 999 },
+            previous: { departmentId: null, assignedUserId: null }
+        });
+        // saiu da fila sem departamento: quem via antes recebe para tirar da lista
+        expect((await visible).conversation.id).toBe(1);
+        expect(received).toEqual(['sem departamento']);
+    });
+
     it('user.revoked derruba as conexões do usuário', async () => {
         const socket = connect({ extraHeaders: { cookie: agentCookie } });
         await once(socket, 'sessions');
